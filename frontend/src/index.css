@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { @apply border-ink; }
+  html { @apply bg-paper text-ink antialiased; }
+  body { @apply m-0 min-w-[320px] min-h-screen overflow-x-hidden bg-paper font-sans; }
+  button, input, select { font: inherit; }
+  button, [role='button'] { @apply cursor-pointer; }
+  :focus-visible { @apply outline-none ring-4 ring-cobalt/30 ring-offset-2 ring-offset-paper; }
+  ::selection { @apply bg-acid text-ink; }
+}
+
+@keyframes network-glow {
+  0%, 100% { transform: scale(.92); opacity: .16; }
+  50% { transform: scale(1.12); opacity: .34; }
+}
+
+.network-node-halo {
+  animation: network-glow 2.8s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.network-paused *, .network-paused .network-node-halo {
+  animation-play-state: paused !important;
+}
+
+@layer components {
+  .paper-grid {
+    background-image: linear-gradient(rgba(17,17,17,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(17,17,17,.045) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .panel { @apply border-2 bg-cream shadow-offset; }
+  .panel-flat { @apply border-2 bg-cream; }
+  .eyebrow { @apply font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-cobalt; }
+  .button-primary { @apply min-h-11 border-2 bg-cobalt px-5 py-2.5 text-sm font-extrabold uppercase tracking-wide text-white shadow-offset-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none; }
+  .button-secondary { @apply min-h-11 border-2 bg-cream px-4 py-2.5 text-sm font-bold text-ink transition-colors duration-200 hover:bg-acid disabled:cursor-not-allowed disabled:opacity-50; }
+  .field { @apply min-h-11 w-full border-2 bg-white px-3.5 py-2 text-base text-ink placeholder:text-slate-500; }
+  .status-dot { @apply inline-block size-2 rounded-full bg-current; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .network-node-halo { animation: none !important; }
+}

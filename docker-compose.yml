@@ -1,0 +1,101 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-recommendations}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-recommendations}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    init: true
+    restart: unless-stopped
+    image: ecommerce-recommendation-lab-api:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@postgres:5432/recommendations}
+      CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:5173"]}'
+      AUTO_CREATE_TABLES: ${AUTO_CREATE_TABLES:-true}
+      SSE_POLL_INTERVAL_SECONDS: ${SSE_POLL_INTERVAL_SECONDS:-0.5}
+      REQUIRE_FULL_DATASET: ${REQUIRE_FULL_DATASET:-true}
+      DATASET_MANIFEST_PATH: /workspace/data/processed/dataset_manifest.json
+      DATASET_STATS_PATH: /workspace/data/processed/dataset_stats.json
+      POPULARITY_PATH: /workspace/data/processed/popularity.json
+      ARTIFACTS_DIR: /workspace/artifacts
+      RECOMMENDATION_CANDIDATE_LIMIT: ${RECOMMENDATION_CANDIDATE_LIMIT:-20000}
+      PRELOAD_ACTIVE_MODEL: ${PRELOAD_ACTIVE_MODEL:-true}
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    volumes:
+      - ./data:/workspace/data
+      - ./artifacts:/workspace/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  trainer:
+    init: true
+    restart: unless-stopped
+    image: ecommerce-recommendation-lab-trainer:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["python", "-m", "app.training.worker"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@postgres:5432/recommendations}
+      ARTIFACTS_DIR: /workspace/artifacts
+      TRAINER_POLL_SECONDS: ${TRAINER_POLL_SECONDS:-2}
+      TRAINER_HEARTBEAT_SECONDS: ${TRAINER_HEARTBEAT_SECONDS:-10}
+      TRAINER_HEARTBEAT_TIMEOUT_SECONDS: ${TRAINER_HEARTBEAT_TIMEOUT_SECONDS:-120}
+      TRAINER_DATABASE_RETRY_SECONDS: ${TRAINER_DATABASE_RETRY_SECONDS:-2}
+      DATASET_MANIFEST_PATH: /workspace/data/processed/dataset_manifest.json
+      TRAINING_SAMPLES_DIR: /workspace/data/processed/samples
+    volumes:
+      - ./data:/workspace/data
+      - ./artifacts:/workspace/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from sqlalchemy import text; from app.database.session import get_session; s = get_session(); s.execute(text('SELECT 1')); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  frontend:
+    image: ecommerce-recommendation-lab-frontend:local
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--output-document=/dev/null", "http://127.0.0.1:5173"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  postgres_data:
