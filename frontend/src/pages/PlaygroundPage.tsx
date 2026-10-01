@@ -156,7 +156,7 @@ export function PlaygroundPage() {
         <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
           <label htmlFor="profile-id"><span className="mb-2 block text-sm font-extrabold">Buscar perfil pseudônimo por profile_id</span><div className="relative"><SearchIcon className="absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-slate-500" /><input id="profile-id" aria-label="Buscar perfil pseudônimo por profile_id" className="field pl-11 font-mono" placeholder="Ex.: 000058a12d5b..." value={query} onChange={(event) => setQuery(event.target.value)} /></div></label>
           <button className="button-primary flex items-center justify-center gap-2" disabled={profileLoading} type="submit"><SearchIcon className="size-4" /> Buscar</button>
-          <button className="button-secondary flex items-center justify-center gap-2" disabled={profileLoading} type="button" onClick={() => void randomProfile()}><RefreshIcon className="size-4" /> Perfil aleatório</button>
+          <button className="button-secondary flex items-center justify-center gap-2" disabled={profileLoading} type="button" onClick={() => void randomProfile()}><RefreshIcon className="size-4" /> Perfil do modelo</button>
         </div>
       </form>
 
@@ -170,7 +170,7 @@ export function PlaygroundPage() {
 
 function WelcomeState({ popular, loading, error, reload }: { popular: Recommendation[]; loading: boolean; error: string; reload: () => Promise<void> }) {
   return <div className="grid gap-6 xl:grid-cols-[.8fr_1.2fr]">
-    <div className="panel grid min-h-[340px] place-items-center bg-ink p-8 text-center text-white"><div><span className="mx-auto grid size-16 place-items-center border-2 border-white bg-coral text-white shadow-[5px_5px_0_#fff]"><SearchIcon className="size-8" /></span><h2 className="mt-6 text-2xl font-extrabold">Qual perfil vamos explorar?</h2><p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-mist">Busque profile_id conhecido ou selecione perfil ativo aleatório. Identidade real nunca aparece.</p></div></div>
+    <div className="panel grid min-h-[340px] place-items-center bg-ink p-8 text-center text-white"><div><span className="mx-auto grid size-16 place-items-center border-2 border-white bg-coral text-white shadow-[5px_5px_0_#fff]"><SearchIcon className="size-8" /></span><h2 className="mt-6 text-2xl font-extrabold">Qual perfil vamos explorar?</h2><p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-mist">Busque um profile_id conhecido ou selecione um perfil coberto pelo modelo ativo. Identidade real nunca aparece.</p></div></div>
     <article className="panel p-5 sm:p-7"><p className="eyebrow">Baseline H&M</p><h2 className="mt-1 text-2xl font-extrabold">Artigos populares</h2><p className="mt-2 text-sm text-slate-600">Mesmo ranking global para todos os perfis.</p>{loading && <div className="mt-5"><LoadingState label="Buscando ranking popular..." /></div>}{!loading && error && <div className="mt-5"><ErrorState message={error} onRetry={() => void reload()} /></div>}{!loading && !error && !popular.length && <div className="mt-5"><EmptyState title="Ranking vazio" description="Nenhum artigo popular retornado." /></div>}{!loading && popular.length > 0 && <RecommendationList recommendations={popular.slice(0, 6)} compact />}</article>
   </div>
 }

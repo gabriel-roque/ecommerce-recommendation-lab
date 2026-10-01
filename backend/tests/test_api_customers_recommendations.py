@@ -8,6 +8,7 @@ from app.api.recommendation_backend import (
 )
 from app.database.models import Article, Customer, ModelVersion, Purchase, TrainingRun
 from app.main import app
+from app.models.mappings import DenseMappings
 
 
 class FakeRecommendationBackend:
@@ -127,6 +128,31 @@ def test_random_customer_honors_personalizable_filter(client, db):
     assert response.status_code == 200
     assert response.json()["profile_id"] == "profile-three"
     assert response.json()["personalizable"] is False
+
+
+def test_random_customer_can_be_limited_to_active_model_profiles(client, db, tmp_path):
+    seed_hm(db)
+    artifact = tmp_path / "artifact"
+    DenseMappings.build([2], [10]).save(artifact)
+    active_model(db, str(artifact))
+
+    response = client.get(
+        "/customers/random?personalizable=true&model_eligible=true"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["profile_id"] == "profile-two"
+
+
+def test_model_eligible_random_customer_requires_active_model(client, db):
+    seed_hm(db)
+
+    response = client.get("/customers/random?model_eligible=true")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "No active model available for model-eligible profile selection"
+    )
 
 
 def test_popular_recommendations_are_hm_only_and_explain_scores(client, db):

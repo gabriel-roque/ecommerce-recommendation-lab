@@ -48,6 +48,17 @@ describe('PlaygroundPage', () => {
     expect(await screen.findByText('Modelo híbrido ainda não cobre este perfil.')).toBeInTheDocument()
   })
 
+  it('loads a random profile covered by the active model', async () => {
+    vi.mocked(api.getRandomProfile).mockResolvedValue({ profile_id: 'model-profile', age_band: '25-34', purchase_count: 10, first_purchase_at: '2020-01-01T00:00:00Z', last_purchase_at: '2020-02-01T00:00:00Z' })
+    const actor = userEvent.setup()
+    render(<PlaygroundPage />)
+
+    await actor.click(screen.getByRole('button', { name: /perfil do modelo/i }))
+
+    expect(await screen.findByText(/profile_id model-profile/i)).toBeInTheDocument()
+    expect(api.getRandomProfile).toHaveBeenCalledWith(expect.any(AbortSignal))
+  })
+
   it('shows not-found error without creating a phantom profile', async () => {
     vi.mocked(api.getProfile).mockRejectedValue(new Error('Profile not found'))
     const actor = userEvent.setup()

@@ -22,6 +22,12 @@ describe('H&M API service', () => {
     expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/customers/abc/history?limit=8&offset=16`, expect.any(Object))
   })
 
+  it('requests a random profile covered by the active model', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ profile_id: 'abc', purchase_count: 1, personalizable: true }))
+    await api.getRandomProfile()
+    expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/customers/random?personalizable=true&model_eligible=true`, expect.any(Object))
+  })
+
   it('surfaces API detail', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ detail: 'Model unavailable' }, 503))
     await expect(api.getProfileRecommendations('abc')).rejects.toEqual(new ApiError('Model unavailable', 503))

@@ -233,7 +233,7 @@ export const api = {
   getTrainingRun: (id: string, signal?: AbortSignal) => request<TrainingRun>(`/training/runs/${encodeURIComponent(id)}`, { signal }),
   getProfile: (profileId: string, signal?: AbortSignal) => request<RawProfile>(`/customers/${encodeURIComponent(profileId)}`, { signal }).then(mapProfile),
   getProfilePurchases: (profileId: string, limit = 8, offset = 0, signal?: AbortSignal) => request<RawPurchaseHistory>(`/customers/${encodeURIComponent(profileId)}/history?limit=${limit}&offset=${offset}`, { signal }).then(mapPurchaseHistory),
-  getRandomProfile: (signal?: AbortSignal) => request<RawProfile>('/customers/random?personalizable=true', { signal }).then(mapProfile),
+  getRandomProfile: (signal?: AbortSignal) => request<RawProfile>('/customers/random?personalizable=true&model_eligible=true', { signal }).then(mapProfile),
   getPopularRecommendations: (k = 10, signal?: AbortSignal) => request<RawRecommendationResult>(`/recommendations/popular?k=${k}`, { signal }).then(mapRecommendationResult),
   getProfileRecommendations: (profileId: string, k = 10, signal?: AbortSignal) => request<RawRecommendationResult>(`/customers/${encodeURIComponent(profileId)}/recommendations?k=${k}&exclude_seen_articles=true`, { signal }).then(mapRecommendationResult),
 }

@@ -58,6 +58,7 @@ from app.database.models import (
     TrainingRun,
 )
 from app.database.session import get_db, get_session
+from app.models.mappings import DenseMappings
 from app.training.config import DATA_PROFILES
 
 router = APIRouter()
@@ -818,7 +819,39 @@ def _customer_response(db: Session, customer: Customer) -> CustomerResponse:
 def random_customer(
     db: DbSession,
     personalizable: bool = True,
+    model_eligible: bool = False,
 ) -> CustomerResponse:
+    if model_eligible:
+        model = db.scalar(select(ModelVersion).where(ModelVersion.is_active.is_(True)))
+        if model is None:
+            raise HTTPException(
+                status_code=409,
+                detail="No active model available for model-eligible profile selection",
+            )
+        _assert_model_dataset_matches(db, model)
+        try:
+            mappings = DenseMappings.load(model.artifact_path)
+        except (OSError, ValueError) as exc:
+            raise HTTPException(
+                status_code=409,
+                detail="Active model customer mappings are unavailable",
+            ) from exc
+        if not mappings.num_customers:
+            raise HTTPException(
+                status_code=409,
+                detail="Active model contains no eligible customer profiles",
+            )
+        customer_key = int(
+            mappings.customer_keys[secrets.randbelow(mappings.num_customers)]
+        )
+        customer = db.get(Customer, customer_key)
+        if customer is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Active model references an unavailable customer profile",
+            )
+        return _customer_response(db, customer)
+
     candidates = select(Customer.customer_key)
     if personalizable:
         purchase_customers = select(Purchase.customer_key).distinct()
