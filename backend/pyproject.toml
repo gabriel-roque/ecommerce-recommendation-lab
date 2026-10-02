@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "hm-recommendation-lab"
+name = "ecommerce-recommendation-lab"
 version = "0.1.0"
-description = "H&M hybrid recommendation lab"
+description = "Brazilian synthetic e-commerce recommendation lab"
 requires-python = ">=3.10,<3.13"
 dependencies = [
   "fastapi>=0.115,<1",

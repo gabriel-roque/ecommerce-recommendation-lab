@@ -156,7 +156,8 @@ def test_invalid_claimed_config_marks_run_failed(db):
 
 def test_training_purchases_loads_cached_profile_without_full_database_load(tmp_path, monkeypatch):
     source_manifest = {
-        "dataset": "hm",
+        "dataset": "ecommerce_sintetico_br",
+        "source_fingerprint": "abc",
         "semantics": "purchase_only",
         "purchases": 3,
         "sampled": False,

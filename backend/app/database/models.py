@@ -21,7 +21,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
 
@@ -46,72 +46,50 @@ BIGINT_PRIMARY_KEY = BigInteger().with_variant(Integer, "sqlite")
 
 
 class Customer(Base):
-    """Canonical H&M customer profile. Source identifiers remain anonymized."""
+    """Synthetic customer profile with public and internal identifiers."""
 
     __tablename__ = "customers"
 
     customer_key: Mapped[int] = mapped_column(Integer, primary_key=True)
     customer_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     profile_id: Mapped[str] = mapped_column(String(36), nullable=False, unique=True)
-    fn: Mapped[int | None] = mapped_column(Integer)
-    active: Mapped[int | None] = mapped_column(Integer)
-    club_member_status: Mapped[str | None] = mapped_column(String(32))
-    fashion_news_frequency: Mapped[str | None] = mapped_column(String(32))
-    age: Mapped[int | None] = mapped_column(Integer)
-    age_band: Mapped[str | None] = mapped_column(String(16))
-    postal_code: Mapped[str | None] = mapped_column(String(64))
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    age: Mapped[int] = mapped_column(Integer, nullable=False)
+    age_band: Mapped[str] = mapped_column(String(16), nullable=False)
+    state: Mapped[str] = mapped_column(String(2), nullable=False)
+    region: Mapped[str] = mapped_column(String(32), nullable=False)
 
     __table_args__ = (
         CheckConstraint("length(customer_id) > 0", name="ck_customers_customer_id"),
-        CheckConstraint("fn IS NULL OR fn IN (0, 1)", name="ck_customers_fn"),
-        CheckConstraint("active IS NULL OR active IN (0, 1)", name="ck_customers_active"),
-        CheckConstraint("age IS NULL OR (age > 0 AND age < 130)", name="ck_customers_age"),
+        CheckConstraint("age >= 18 AND age <= 80", name="ck_customers_age"),
         Index("ix_customers_profile_id", "profile_id"),
     )
 
 
 class Article(Base):
-    """Canonical H&M article catalog with every official CSV field."""
+    """Generic product catalog used by recommendation models."""
 
     __tablename__ = "articles"
 
     article_key: Mapped[int] = mapped_column(Integer, primary_key=True)
     article_id: Mapped[str] = mapped_column(String(16), nullable=False, unique=True)
-    product_code: Mapped[str] = mapped_column(String(16), nullable=False)
-    prod_name: Mapped[str] = mapped_column(Text, nullable=False)
-    product_type_no: Mapped[int] = mapped_column(Integer, nullable=False)
-    product_type_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    product_group_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    graphical_appearance_no: Mapped[int] = mapped_column(Integer, nullable=False)
-    graphical_appearance_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    colour_group_code: Mapped[int] = mapped_column(Integer, nullable=False)
-    colour_group_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    perceived_colour_value_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    perceived_colour_value_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    perceived_colour_master_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    perceived_colour_master_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    department_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    product_name: Mapped[str] = mapped_column(Text, nullable=False)
     department_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    index_code: Mapped[str] = mapped_column(String(8), nullable=False)
-    index_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    index_group_no: Mapped[int] = mapped_column(Integer, nullable=False)
-    index_group_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    section_no: Mapped[int] = mapped_column(Integer, nullable=False)
-    section_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    garment_group_no: Mapped[int] = mapped_column(Integer, nullable=False)
-    garment_group_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    detail_desc: Mapped[str | None] = mapped_column(Text)
-    product_name = synonym("prod_name")
+    category_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    subcategory_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    brand: Mapped[str] = mapped_column(String(128), nullable=False)
+    price_band: Mapped[str] = mapped_column(String(32), nullable=False)
+    detail_desc: Mapped[str] = mapped_column(Text, nullable=False)
 
     __table_args__ = (
         CheckConstraint("length(article_id) > 0", name="ck_articles_article_id"),
-        Index("ix_articles_product_group_name", "product_group_name"),
-        Index("ix_articles_section_name", "section_name"),
+        Index("ix_articles_department_name", "department_name"),
+        Index("ix_articles_category_name", "category_name"),
     )
 
 
 class Purchase(Base):
-    """H&M purchase fact with source date and exact decimal price semantics."""
+    """Observed purchase with BRL price and sales channel."""
 
     __tablename__ = "purchases"
 
@@ -123,15 +101,26 @@ class Purchase(Base):
     article_key: Mapped[int] = mapped_column(
         ForeignKey("articles.article_key", ondelete="RESTRICT"), nullable=False
     )
-    price: Mapped[Decimal] = mapped_column(Numeric(20, 18), nullable=False)
+    price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     sales_channel_id: Mapped[int] = mapped_column(Integer, nullable=False)
 
     __table_args__ = (
-        CheckConstraint("price >= 0", name="ck_purchases_price"),
+        CheckConstraint("price > 0", name="ck_purchases_price"),
         CheckConstraint("sales_channel_id IN (1, 2)", name="ck_purchases_sales_channel"),
         Index("ix_purchases_customer_date", "customer_key", "t_dat", "id"),
         Index("ix_purchases_customer_article", "customer_key", "article_key"),
         Index("ix_purchases_article_date", "article_key", "t_dat"),
+    )
+
+
+class DatasetState(Base):
+    __tablename__ = "dataset_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    dataset: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    imported_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
     )
 
 

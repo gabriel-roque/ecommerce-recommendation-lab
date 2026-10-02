@@ -16,16 +16,17 @@ export interface AgeCoverage {
 
 export interface DatasetStats {
   dataset_name: string
+  currency: 'BRL'
   purchase_count: number
-  profile_count: number
-  article_count: number
-  average_purchases_per_profile: number
-  median_purchases_per_profile: number
-  average_purchases_per_article: number
+  customer_count: number
+  product_count: number
+  average_purchases_per_customer: number
+  median_purchases_per_customer: number
+  average_purchases_per_product: number
   date_range: { start: string | null; end: string | null }
   sampled: boolean
-  purchases_per_profile: Array<{ bucket: string; profiles: number }>
-  top_articles: Array<{ article_id: string; purchases: number }>
+  purchases_per_customer: Array<{ bucket: string; customers: number }>
+  top_products: Array<{ article_id: string; product_name: string; purchases: number }>
   age_coverage: AgeCoverage
 }
 
@@ -74,6 +75,7 @@ export interface NetworkSnapshot {
   epoch: number
   timestamp: string
   probe_profile_id: string | null
+  probe_customer_name?: string | null
   probe_article_id: string | null
   profile_embedding: number[]
   article_embedding: number[]
@@ -122,32 +124,35 @@ export type TrainingEvent =
   | { type: 'completed'; run: TrainingRun }
   | { type: 'failed'; error_message: string }
 
-export interface Profile {
+export interface Customer {
   profile_id: string
-  age_band: string | null
+  name: string
+  state: string
+  region: string
+  age_band: string
   purchase_count: number
   first_purchase_at: string | null
   last_purchase_at: string | null
+  personalizable: boolean
 }
 
-export interface ArticleMetadata {
+export interface Product {
   article_id: string
-  product_name: string | null
-  product_type_name: string | null
-  product_group_name: string | null
-  colour_group_name: string | null
-  department_name: string | null
-  section_name: string | null
-  garment_group_name: string | null
-  detail_desc: string | null
+  product_name: string
+  department_name: string
+  category_name: string
+  subcategory_name: string
+  brand: string
+  price_band: string
+  detail_desc: string
 }
 
 export interface Purchase {
   purchased_at: string
   article_id: string
-  source_price: number
-  sales_channel_id: number | null
-  article: ArticleMetadata
+  price: number
+  sales_channel_id: number
+  article: Product
 }
 
 export interface PurchaseHistory {
@@ -159,26 +164,42 @@ export interface PurchaseHistory {
 }
 
 export interface RecommendationEvidence {
-  reason: string
-  cohort_buyers: number
-  related_history_articles: number
-  same_department: boolean
+  kind: string
+  description: string
+  purchase_count?: number
+  customer_count?: number
+  related_article_ids: string[]
 }
+
+export interface RecommendationComponent {
+  raw_score: number
+  weight: number
+  contribution: number
+  label: string
+  explanation: string
+}
+
+export type RecommendationGrade = 'baixo' | 'medio' | 'alto' | 'muito_alto'
+export type RecommendationWeights = Record<'model' | 'category' | 'popularity' | 'trend', number>
 
 export interface Recommendation {
   rank: number
   article_id: string
-  relevance_score: number
-  article: ArticleMetadata
+  score: number
+  grade: RecommendationGrade
+  article: Product
   evidence: RecommendationEvidence[]
+  breakdown: Partial<Record<keyof RecommendationWeights, RecommendationComponent>>
 }
 
 export interface RecommendationResult {
   profile_id: string
-  strategy: 'popular' | 'hybrid'
+  strategy: 'popularity' | 'model'
   fallback_reason: string | null
   model_version: string | null
-  exclude_purchased_articles: boolean
+  score_semantics: { name: string; description: string; minimum: 0; maximum: 100 }
+  applied_weights: RecommendationWeights
+  exclude_seen_articles: boolean
   inference_duration_ms: number
   recommendations: Recommendation[]
 }

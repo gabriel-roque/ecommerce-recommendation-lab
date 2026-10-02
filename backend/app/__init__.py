@@ -1,1 +1,1 @@
-"""H&M recommendation lab backend."""
+"""E-commerce Recommendation Lab backend."""

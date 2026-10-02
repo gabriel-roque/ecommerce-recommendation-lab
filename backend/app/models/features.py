@@ -1,4 +1,4 @@
-"""Dense categorical H&M profile and article features."""
+"""Dense categorical customer and product features."""
 
 from __future__ import annotations
 
@@ -14,19 +14,13 @@ from .mappings import DenseMappings
 
 CUSTOMER_FEATURES = (
     "age_band",
-    "fn",
-    "active",
-    "club_member_status",
-    "fashion_news_frequency",
 )
 ARTICLE_FEATURES = (
-    "product_type_name",
-    "product_group_name",
-    "colour_group_name",
     "department_name",
-    "index_name",
-    "section_name",
-    "garment_group_name",
+    "category_name",
+    "subcategory_name",
+    "brand",
+    "price_band",
 )
 FEATURE_NAMES = CUSTOMER_FEATURES + ARTICLE_FEATURES
 
@@ -65,11 +59,11 @@ class HybridFeatures:
 
     def __post_init__(self) -> None:
         if set(self.customer_values) != set(CUSTOMER_FEATURES):
-            raise ValueError("Customer feature set does not match H&M hybrid schema")
+            raise ValueError("Customer feature set does not match hybrid schema")
         if set(self.article_values) != set(ARTICLE_FEATURES):
-            raise ValueError("Article feature set does not match H&M hybrid schema")
+            raise ValueError("Article feature set does not match hybrid schema")
         if set(self.vocabularies) != set(FEATURE_NAMES):
-            raise ValueError("Feature vocabularies do not match H&M hybrid schema")
+            raise ValueError("Feature vocabularies do not match hybrid schema")
         customer_values: dict[str, np.ndarray] = {}
         article_values: dict[str, np.ndarray] = {}
         for name, values in {**self.customer_values, **self.article_values}.items():

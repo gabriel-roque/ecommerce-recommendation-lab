@@ -82,10 +82,16 @@ def generate_validation_report(
     manifest_source = Path(manifest_path)
     manifest = _load_json(manifest_source)
     required = (
+        "dataset",
+        "dataset_name",
         "files",
         "source_files",
         "source_fingerprint",
-        "official_counts_validated",
+        "synthetic",
+        "sampled",
+        "locale",
+        "currency",
+        "total_records",
         "catalog_customers",
         "catalog_articles",
         "interacting_customers",

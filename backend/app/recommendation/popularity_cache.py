@@ -30,16 +30,16 @@ def _source_key(db: Session) -> str:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if (
             isinstance(manifest, dict)
-            and manifest.get("dataset") == "hm"
+            and manifest.get("dataset") == "ecommerce_sintetico_br"
             and manifest.get("semantics") == "purchase_only"
         ):
             source = json.dumps(manifest, sort_keys=True, separators=(",", ":"))
         else:
-            raise ValueError("Popularity requires a full purchase-only H&M manifest")
+            raise ValueError("Popularidade requer manifesto completo do dataset sintético")
     except OSError:
         source = str(db.get_bind().url)
     except json.JSONDecodeError as exc:
-        raise ValueError("Popularity requires a valid H&M manifest") from exc
+        raise ValueError("Popularidade requer manifesto válido") from exc
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
@@ -69,7 +69,7 @@ def _build(db: Session) -> PopularityRecommender:
         .order_by(desc(purchase_count), Purchase.article_key)
     ).all()
     if not rows:
-        raise ValueError("Cannot build popularity cache with no H&M purchases")
+        raise ValueError("Não é possível calcular popularidade sem compras")
     item_ids = np.asarray([row[0] for row in rows], dtype=np.int64)
     raw_scores = np.asarray([row[1] for row in rows], dtype=np.float64)
     return PopularityRecommender(item_ids, raw_scores / raw_scores[0])

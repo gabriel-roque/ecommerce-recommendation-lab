@@ -67,7 +67,7 @@ def _purchase_manifest(
     return {
         "cache_version": SAMPLE_CACHE_VERSION,
         "profile": profile,
-        "dataset": "hm",
+        "dataset": "ecommerce_sintetico_br",
         "semantics": "purchase_only",
         "target_purchases": DATA_PROFILES[profile]["target_purchases"],
         "actual_purchases": int(timestamps.size),

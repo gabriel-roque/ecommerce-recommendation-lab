@@ -1,5 +1,6 @@
 {
-  "name": "hm-recommendation-lab",
+  "name": "ecommerce-recommendation-lab-frontend",
+  "description": "Interface em PT-BR do E-commerce Recommendation Lab",
   "private": true,
   "version": "0.1.0",
   "type": "module",

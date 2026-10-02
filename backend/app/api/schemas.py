@@ -18,13 +18,14 @@ class DateRangeResponse(BaseModel):
 
 class TopArticleResponse(BaseModel):
     article_id: str
+    product_name: str
     purchases: int = Field(ge=0)
 
 
 class DatasetStatsResponse(BaseModel):
-    dataset_name: Literal["H&M Personalized Fashion Recommendations"] = (
-        "H&M Personalized Fashion Recommendations"
-    )
+    dataset_name: Literal["E-commerce Recommendation Lab"] = "E-commerce Recommendation Lab"
+    locale: Literal["pt-BR"] = "pt-BR"
+    currency: Literal["BRL"] = "BRL"
     semantics: Literal["purchase_history"] = "purchase_history"
     total_purchases: int = Field(ge=0)
     unique_customers: int = Field(ge=0)
@@ -92,6 +93,7 @@ class NetworkSnapshotResponse(BaseModel):
     epoch: int
     timestamp: datetime
     probe_profile_id: str | None
+    probe_customer_name: str | None
     probe_article_id: str | None
     profile_embedding: list[float]
     article_embedding: list[float]
@@ -158,19 +160,21 @@ class ModelVersionResponse(BaseModel):
 
 class ArticleResponse(BaseModel):
     article_id: str
-    product_name: str | None = None
-    product_type_name: str | None = None
-    product_group_name: str | None = None
-    colour_group_name: str | None = None
-    department_name: str | None = None
-    section_name: str | None = None
-    garment_group_name: str | None = None
-    detail_desc: str | None = None
+    product_name: str
+    department_name: str
+    category_name: str
+    subcategory_name: str
+    brand: str
+    price_band: str
+    detail_desc: str
 
 
 class CustomerResponse(BaseModel):
     profile_id: str
-    age_band: str | None = None
+    name: str
+    age_band: str
+    state: str
+    region: str
     purchase_count: int = Field(ge=0)
     first_purchase_date: date | None
     last_purchase_date: date | None
@@ -209,9 +213,11 @@ class RecommendationEvidence(BaseModel):
 class RecommendationItem(BaseModel):
     rank: PositiveInt
     article_id: str
-    score: float = Field(ge=0, le=1)
+    score: float = Field(ge=0, le=100)
+    grade: Literal["baixo", "medio", "alto", "muito_alto"]
     article: ArticleResponse
     evidence: list[RecommendationEvidence] = Field(min_length=1)
+    breakdown: dict[str, "RecommendationComponent"]
 
     @field_validator("score")
     @classmethod
@@ -228,10 +234,18 @@ class ModelMetadataResponse(BaseModel):
 
 
 class ScoreSemanticsResponse(BaseModel):
-    name: Literal["model_ranking_score", "normalized_purchase_popularity"]
+    name: Literal["hybrid_ranking_score", "normalized_purchase_popularity"]
     description: str
     minimum: Literal[0] = 0
-    maximum: Literal[1] = 1
+    maximum: Literal[100] = 100
+
+
+class RecommendationComponent(BaseModel):
+    raw_score: float = Field(ge=0, le=1)
+    weight: float = Field(ge=0, le=100)
+    contribution: float = Field(ge=0, le=100)
+    label: str
+    explanation: str
 
 
 class RecommendationResponse(BaseModel):
@@ -247,6 +261,7 @@ class RecommendationResponse(BaseModel):
     ] | None = None
     model: ModelMetadataResponse | None = None
     score_semantics: ScoreSemanticsResponse
+    applied_weights: dict[str, float]
     exclude_seen_articles: bool
     inference_duration_ms: float = Field(ge=0)
     items: list[RecommendationItem]

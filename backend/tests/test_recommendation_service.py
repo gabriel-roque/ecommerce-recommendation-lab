@@ -59,6 +59,7 @@ def test_known_user_scores_catalog_in_batches_and_excludes_seen_items():
     assert result.strategy == "neural"
     assert [item.article_key for item in result.recommendations] == [30, 20]
     assert all(size <= 2 for size in model.batch_sizes)
+    assert sum(model.batch_sizes) == 3
     assert not {40, 50}.intersection(item.article_key for item in result.recommendations)
 
 
@@ -75,7 +76,7 @@ def test_unknown_user_gets_popularity_cold_start():
 
     assert result.strategy == "popularity"
     assert result.cold_start is True
-    assert result.reason == "customer_not_in_hm_artifact"
+    assert result.reason == "customer_not_in_artifact"
     assert [item.article_key for item in result.recommendations] == [30, 20]
 
 

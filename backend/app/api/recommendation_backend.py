@@ -98,12 +98,19 @@ class ApplicationRecommendationBackend:
             lambda requested_customer_key: (
                 exclude_item_ids if requested_customer_key == customer_key else set()
             ),
-            candidate_article_keys=popularity.article_keys,
-            candidate_limit=settings.recommendation_candidate_limit,
+            candidate_article_keys=artifact.mappings.article_keys,
+            candidate_limit=None,
         )
         result = service.recommend(
             customer_key,
-            k,
+            max(
+                1,
+                artifact.mappings.num_articles
+                - sum(
+                    artifact.mappings.article_index(article_key) is not None
+                    for article_key in exclude_item_ids
+                ),
+            ),
             exclude_seen_items=bool(exclude_item_ids),
         )
         response = BackendRecommendationResult(

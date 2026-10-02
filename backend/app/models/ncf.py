@@ -1,4 +1,4 @@
-"""H&M multi-input hybrid recommendation model."""
+"""Generic multi-input hybrid recommendation model."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def build_hybrid_model(
     from .features import ARTICLE_FEATURES, CUSTOMER_FEATURES, FEATURE_NAMES
 
     if set(feature_cardinalities) != set(FEATURE_NAMES):
-        raise ValueError("Feature cardinalities do not match H&M hybrid schema")
+        raise ValueError("Feature cardinalities do not match hybrid schema")
     if any(value <= 0 for value in feature_cardinalities.values()):
         raise ValueError("Feature cardinalities must be positive")
 
@@ -102,7 +102,7 @@ def build_hybrid_model(
     model = tensorflow.keras.Model(
         inputs=inputs,
         outputs=score,
-        name="hm_hybrid_recommender",
+        name="ecommerce_hybrid_recommender",
     )
     model.compile(
         optimizer=tensorflow.keras.optimizers.Adam(learning_rate=learning_rate),

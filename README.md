@@ -1,178 +1,135 @@
-# H&M Hybrid Recommendation Lab
+# E-commerce Recommendation Lab
 
-Laboratório didático de recomendação de moda baseado exclusivamente no dataset **H&M Personalized Fashion Recommendations**. O projeto cobre validação e importação dos dados, treinamento de um modelo híbrido em TensorFlow, inferência com fallback de popularidade, API FastAPI e interface React.
-
-## O que o projeto demonstra
-
-- compras como único sinal de interação observado;
-- embeddings colaborativos de perfis e artigos;
-- faixa etária como contexto do perfil;
-- metadados do catálogo como contexto do artigo;
-- split cronológico para treino, validação e teste;
-- métricas de ranking `Recall@10`, `HitRate@10` e `NDCG@10`;
-- acompanhamento de treino por Server-Sent Events (SSE);
-- recomendações com evidências factuais e fallback explícito;
-- IDs públicos pseudonimizados e ausência de idade exata na API.
-
-Scores representam relevância relativa para ordenação. Eles não são probabilidades calibradas nem estimativas causais.
+Laboratório didático de recomendação para e-commerce brasileiro. O projeto usa apenas dados sintéticos em PT-BR, versionados no repositório, com preços em BRL.
 
 ## Dataset
 
-Baixe os arquivos na página da competição [H&M Personalized Fashion Recommendations](https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations/data) e coloque estes três CSVs em `data/raw/`:
+O dataset padrão é `ecommerce_sintetico_br` e fica em `data/ecommerce_sintetico_br/`:
 
-```text
-data/raw/
-├── articles.csv
-├── customers.csv
-└── transactions_train.csv
+- `customers.csv`: 2.000 clientes brasileiros;
+- `products.csv`: 500 produtos genéricos;
+- `purchases.csv`: 47.500 compras;
+- `dataset_manifest.json`: checksums, fingerprint, contagens e contrato da fonte;
+- `dataset_stats.json`: estatísticas observadas.
+
+Os três CSVs somam exatamente 50.000 registros. O gerador usa seed fixa e produz os mesmos bytes em toda execução:
+
+```bash
+PYTHONPATH=backend python -m app.cli generate-data
+PYTHONPATH=backend python -m app.cli verify-data
 ```
 
-O pipeline preserva todos os campos oficiais desses arquivos. A camada de treino usa:
-
-- `transactions_train.csv`: data, perfil, artigo, preço de origem e canal de venda;
-- `customers.csv`: idade convertida para faixa etária e atributos categóricos do perfil;
-- `articles.csv`: tipo, grupo, cor, departamento, seção, grupo de vestuário e demais metadados.
-
-O dataset não declara moeda para `price`, não contém avaliações, estoque ou eventos de navegação. A interface identifica o valor somente como **preço de origem**.
+O sinal sintético inclui afinidades fortes, cauda longa de clientes e produtos, sazonalidade, tendência recente e ruído. As personas fixas são Lucas, Mariana, Rafael, Camila, Juliana e Bruno.
 
 ## Arquitetura
 
 ```text
-CSV H&M -> validação e manifesto -> PostgreSQL
-                                      |
-                                      v
-                              trainer TensorFlow
-                                      |
-                                      v
-                             artefato hm-hybrid
-                                      |
-                                      v
-React <- FastAPI <- ranking híbrido / popularidade
+CSV sintético -> bootstrap idempotente -> PostgreSQL
+                                         |
+                                         v
+                                 trainer TensorFlow
+                                         |
+                                         v
+                              artefato ecommerce-hybrid
+                                         |
+                                         v
+React <- FastAPI <- ranking explicável / fallback de popularidade
 ```
 
-Tabelas canônicas:
+Tabelas principais:
 
-- `customers`: catálogo de perfis, ID público pseudônimo e faixa etária;
-- `articles`: catálogo completo de artigos;
-- `purchases`: compras observadas;
-- `training_runs`, `training_metrics`, `training_network_snapshots`: telemetria de treino;
+- `customers`: ID interno, ID público, nome, idade, faixa etária, estado e região;
+- `articles`: produto, departamento, categoria, subcategoria, marca e faixa de preço;
+- `purchases`: data, cliente, produto, preço BRL e canal;
+- `dataset_state`: fingerprint importado;
+- `training_runs`, `training_metrics`, `training_network_snapshots`: execução e telemetria;
 - `model_versions`: artefatos treinados e ativação.
 
-O modelo combina embeddings de perfil e artigo com embeddings das features categóricas. Amostras negativas são geradas durante o treino. A inferência exclui artigos já comprados por padrão. Perfis fora do artefato ou falhas de carregamento usam popularidade de compras com motivo explícito.
+## Docker
 
-## Execução com Docker
-
-Requisitos:
-
-- Docker com Compose;
-- aproximadamente 10 GB livres para dados, banco, imagens e artefatos;
-- os três CSVs H&M em `data/raw/`.
-
-Copie as variáveis opcionais e inicie o banco:
+Requisitos: Docker Compose v1.29 ou Compose v2.
 
 ```bash
 cp .env.example .env
-docker compose up -d postgres
+docker compose up --build
 ```
 
-Valide e importe o dataset completo:
+Também funciona com `docker-compose up --build`.
 
-```bash
-docker compose run --rm api python -m app.cli import-data --full
-docker compose run --rm api python -m app.cli optimize-db
-docker compose run --rm api python -m app.cli validate-full --external-tests-passed
-```
+O serviço one-shot `bootstrap` aguarda PostgreSQL, valida os CSVs, importa apenas quando o fingerprint muda e enfileira exatamente um treino automático para esse fingerprint. `api` e `trainer` iniciam somente após sucesso do bootstrap. Segundo boot preserva banco, modelo e volume, sem nova importação ou novo treino.
 
-Inicie aplicação:
-
-```bash
-docker compose up --build -d api trainer frontend
-```
-
-Acesse:
+Serviços:
 
 - frontend: <http://localhost:5173>
 - API: <http://localhost:8000>
-- documentação OpenAPI: <http://localhost:8000/docs>
-
-A importação completa processa `31.788.324` compras e pode levar vários minutos. O perfil de treino `full` pode levar horas, conforme CPU, memória e armazenamento disponíveis.
+- OpenAPI: <http://localhost:8000/docs>
 
 ## Treinamento
 
-A tela **Training Lab** oferece quatro escopos determinísticos:
+Perfis determinísticos:
 
-- `fast`: 25.000 compras;
-- `balanced`: 100.000 compras;
-- `extensive`: 250.000 compras;
-- `full`: todas as compras.
+- `fast`: 10.000 compras;
+- `balanced`: 25.000 compras;
+- `extensive`: 40.000 compras;
+- `full`: todas as 47.500 compras.
 
-Também é possível iniciar um treino pela API:
+Primeiro boot enfileira `full`, 4 epochs, batch 2.048. Enquanto treino não termina, API usa fallback de popularidade. Artefatos têm formato `ecommerce-hybrid` versão 2 e registram `source_fingerprint`.
+
+Treino manual continua disponível:
 
 ```bash
 curl -X POST http://localhost:8000/training/runs \
   -H 'Content-Type: application/json' \
-  -d '{"data_profile":"fast","epochs":3,"embedding_dim":32,"dense_1":64,"dense_2":32,"batch_size":4096,"negative_ratio":2,"learning_rate":0.001}'
+  -d '{"data_profile":"fast","epochs":3,"batch_size":2048}'
 ```
 
-O trainer salva um artefato versionado em `artifacts/`, valida pesos e uma inferência real após recarregar o modelo e ativa a nova versão somente depois dessa validação.
+## Ranking
 
-## API principal
+`GET /customers/{profile_id}/recommendations` pontua todo produto elegível do catálogo. Com modelo ativo, score final usa escala 0 a 100:
 
-- `GET /health`: saúde da API e do banco;
-- `GET /dataset/stats`: cobertura do catálogo, compras e faixas etárias;
-- `GET /training/profiles`: escopos de treino;
-- `POST /training/runs`: cria treino;
-- `GET /training/runs`: lista treinos;
-- `GET /training/runs/{id}`: estado, métricas e avaliação;
-- `GET /training/runs/{id}/events`: stream SSE;
-- `GET /customers/random?personalizable=true`: seleciona perfil público ativo;
-- `GET /customers/{profile_id}`: resumo público do perfil;
-- `GET /customers/{profile_id}/history`: compras paginadas;
-- `GET /customers/{profile_id}/recommendations`: ranking híbrido ou fallback;
-- `GET /recommendations/popular`: baseline global por compras.
-
-## Privacidade e explicabilidade
-
-- `customer_id` original nunca é exposto pela API;
-- `profile_id` é derivado com hash e usado como identificador público;
-- idade exata e código postal não são expostos;
-- faixa etária é mostrada apenas como contexto agregado;
-- evidências descrevem contagens observadas, afinidade de departamento e coorte etária;
-- respostas distinguem ranking do modelo e fallback de popularidade.
-
-## Testes
-
-Backend:
-
-```bash
-python -m pytest backend/tests -q
-python -m mypy backend/app
+```text
+45 * model_raw + 30 * category_raw + 15 * popularity_raw + 10 * trend_raw
 ```
 
-Frontend:
+Pesos podem ser alterados por `model_weight`, `category_weight`, `popularity_weight` e `trend_weight`. Todos devem ser não negativos e somar 100. Resposta inclui `applied_weights`, grade (`baixo`, `medio`, `alto`, `muito_alto`) e breakdown factual dos quatro componentes.
+
+Score serve somente para ordenação. Não representa probabilidade de compra nem efeito causal. Sem modelo, API informa motivo e usa popularidade observada com normalização logarítmica.
+
+## API
+
+- `GET /health`
+- `GET /dataset/stats`
+- `GET /training/profiles`
+- `POST /training/runs`
+- `GET /training/runs`
+- `GET /training/runs/{id}`
+- `GET /training/runs/{id}/events`
+- `GET /customers/random`
+- `GET /customers/{profile_id}`
+- `GET /customers/{profile_id}/history`
+- `GET /customers/{profile_id}/recommendations`
+- `GET /recommendations/popular`
+
+## Verificação
+
+Execute da raiz:
 
 ```bash
-npm --prefix frontend test
-npm --prefix frontend run build
-```
-
-Validação integral de arquivos, banco e importação:
-
-```bash
-docker compose run --rm api python -m app.cli validate-full
+PYTHONPATH=.:backend python -m pytest backend/tests -q
+cd backend && python -m mypy app
+docker compose config
 ```
 
 ## Estrutura
 
 ```text
-backend/app/api/             contratos HTTP e SSE
-backend/app/database/        modelos e sessões SQLAlchemy
-backend/app/dataset/         validação, manifesto e importação H&M
+backend/app/api/             contratos HTTP, ranking e SSE
+backend/app/database/        schema e sessões SQLAlchemy
+backend/app/dataset/         gerador, validação, manifesto e importação
 backend/app/models/          features, mappings, modelo e artefatos
-backend/app/recommendation/  ranking e popularidade
+backend/app/recommendation/  inferência e popularidade
 backend/app/training/        sampling, pipeline, métricas e worker
-frontend/src/                aplicação React
-data/raw/                    CSVs H&M
-data/processed/              manifestos, estatísticas e caches
-artifacts/                   modelos H&M versionados
+data/ecommerce_sintetico_br/ dataset versionado
+data/processed/              caches e resultados derivados ignorados
+artifacts/                   modelos locais ignorados
 ```

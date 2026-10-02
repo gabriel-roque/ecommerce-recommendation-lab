@@ -127,8 +127,8 @@ class RecommendationService:
         *,
         exclude_seen_items: bool = True,
     ) -> RecommendationResult:
-        if not 1 <= k <= 100:
-            raise ValueError("k must be between 1 and 100")
+        if not 1 <= k <= self.mappings.num_articles:
+            raise ValueError("k must be between 1 and catalog size")
         started = time.perf_counter()
         source_customer_key = int(customer_key)
         seen = self._seen(source_customer_key) if exclude_seen_items else set()
@@ -142,7 +142,7 @@ class RecommendationService:
                 recommendations,
                 time.perf_counter() - started,
                 True,
-                "customer_not_in_hm_artifact",
+                "customer_not_in_artifact",
             )
 
         if self.candidate_article_keys is None:
@@ -191,7 +191,7 @@ class RecommendationService:
             recommendations,
             time.perf_counter() - started,
             False,
-            "personalized_hm_hybrid",
+            "personalized_ecommerce_hybrid",
         )
 
 

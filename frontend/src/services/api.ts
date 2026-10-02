@@ -1,10 +1,11 @@
 import type {
-  ArticleMetadata,
+  Customer,
   DatasetStats,
-  Profile,
+  Product,
   PurchaseHistory,
   Recommendation,
   RecommendationResult,
+  RecommendationWeights,
   TrainingConfig,
   TrainingEvent,
   TrainingProfilesResponse,
@@ -13,34 +14,30 @@ import type {
 
 interface RawDatasetStats {
   dataset_name: string
+  currency: 'BRL'
   total_purchases: number
   unique_customers: number
   unique_articles: number
-  purchased_articles: number
   average_purchases_per_customer: number
   median_purchases_per_customer: number
   average_purchases_per_article: number
   date_range: { start: string | null; end: string | null }
   sampled: boolean
   purchases_per_customer: Record<string, number>
-  top_articles: Array<{ article_id: string; purchases: number }>
+  top_articles: Array<{ article_id: string; product_name: string; purchases: number }>
   age_band_counts: Record<string, number>
 }
 
-interface RawProfile {
+interface RawCustomer {
   profile_id: string
-  age_band: string | null
+  name: string
+  state: string
+  region: string
+  age_band: string
   purchase_count: number
   first_purchase_date: string | null
   last_purchase_date: string | null
-}
-
-interface RawPurchase {
-  article_id: string
-  purchased_on: string
-  price: number
-  sales_channel_id: number
-  article: ArticleMetadata
+  personalizable: boolean
 }
 
 interface RawPurchaseHistory {
@@ -48,30 +45,19 @@ interface RawPurchaseHistory {
   total: number
   limit: number
   offset: number
-  items: RawPurchase[]
-}
-
-interface RawRecommendation {
-  rank: number
-  article_id: string
-  score: number
-  article: ArticleMetadata
-  evidence: Array<{
-    kind: string
-    description: string
-    purchase_count?: number
-    customer_count?: number
-    related_article_ids?: string[]
+  items: Array<{
+    article_id: string
+    purchased_on: string
+    price: number
+    sales_channel_id: number
+    article: Product
   }>
 }
 
-interface RawRecommendationResult {
+interface RawRecommendationResult extends Omit<RecommendationResult, 'profile_id' | 'model_version' | 'recommendations'> {
   profile_id: string | null
-  strategy: 'model' | 'popularity'
-  items: RawRecommendation[]
-  inference_duration_ms: number | null
   model: { version: string } | null
-  fallback_reason: string | null
+  items: Recommendation[]
 }
 
 interface RawTrainingProfilesResponse {
@@ -89,16 +75,17 @@ function mapDatasetStats(stats: RawDatasetStats): DatasetStats {
   const known = Math.max(0, stats.unique_customers - missing)
   return {
     dataset_name: stats.dataset_name,
+    currency: stats.currency,
     purchase_count: stats.total_purchases,
-    profile_count: stats.unique_customers,
-    article_count: stats.unique_articles,
-    average_purchases_per_profile: stats.average_purchases_per_customer,
-    median_purchases_per_profile: stats.median_purchases_per_customer,
-    average_purchases_per_article: stats.average_purchases_per_article,
+    customer_count: stats.unique_customers,
+    product_count: stats.unique_articles,
+    average_purchases_per_customer: stats.average_purchases_per_customer,
+    median_purchases_per_customer: stats.median_purchases_per_customer,
+    average_purchases_per_product: stats.average_purchases_per_article,
     date_range: stats.date_range,
     sampled: stats.sampled,
-    purchases_per_profile: Object.entries(stats.purchases_per_customer).map(([bucket, profiles]) => ({ bucket, profiles })),
-    top_articles: stats.top_articles,
+    purchases_per_customer: Object.entries(stats.purchases_per_customer).map(([bucket, customers]) => ({ bucket, customers })),
+    top_products: stats.top_articles,
     age_coverage: {
       known,
       missing,
@@ -108,13 +95,11 @@ function mapDatasetStats(stats: RawDatasetStats): DatasetStats {
   }
 }
 
-function mapProfile(profile: RawProfile): Profile {
+function mapCustomer(customer: RawCustomer): Customer {
   return {
-    profile_id: profile.profile_id,
-    age_band: profile.age_band,
-    purchase_count: profile.purchase_count,
-    first_purchase_at: profile.first_purchase_date,
-    last_purchase_at: profile.last_purchase_date,
+    ...customer,
+    first_purchase_at: customer.first_purchase_date,
+    last_purchase_at: customer.last_purchase_date,
   }
 }
 
@@ -127,24 +112,9 @@ function mapPurchaseHistory(history: RawPurchaseHistory): PurchaseHistory {
     purchases: history.items.map((purchase) => ({
       article_id: purchase.article_id,
       purchased_at: purchase.purchased_on,
-      source_price: purchase.price,
+      price: purchase.price,
       sales_channel_id: purchase.sales_channel_id,
       article: purchase.article,
-    })),
-  }
-}
-
-function mapRecommendation(item: RawRecommendation): Recommendation {
-  return {
-    rank: item.rank,
-    article_id: item.article_id,
-    relevance_score: item.score,
-    article: item.article,
-    evidence: item.evidence.map((fact) => ({
-      reason: fact.description,
-      cohort_buyers: fact.kind === 'age_band_popularity' ? fact.customer_count ?? 0 : 0,
-      related_history_articles: fact.kind === 'purchase_history_department' ? fact.related_article_ids?.length ?? 0 : 0,
-      same_department: fact.kind === 'purchase_history_department',
     })),
   }
 }
@@ -152,12 +122,14 @@ function mapRecommendation(item: RawRecommendation): Recommendation {
 function mapRecommendationResult(result: RawRecommendationResult): RecommendationResult {
   return {
     profile_id: result.profile_id ?? '',
-    strategy: result.strategy === 'model' ? 'hybrid' : 'popular',
+    strategy: result.strategy,
     fallback_reason: result.fallback_reason,
     model_version: result.model?.version ?? null,
-    exclude_purchased_articles: true,
+    score_semantics: result.score_semantics,
+    applied_weights: result.applied_weights,
+    exclude_seen_articles: result.exclude_seen_articles,
     inference_duration_ms: result.inference_duration_ms ?? 0,
-    recommendations: result.items.map(mapRecommendation),
+    recommendations: result.items,
   }
 }
 
@@ -192,23 +164,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(message, response.status)
   }
-
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }
 
-interface RequestOptions {
-  signal?: AbortSignal
-  force?: boolean
-}
-
+interface RequestOptions { signal?: AbortSignal; force?: boolean }
 type CacheEntry<T> = { value?: T }
 const datasetCache: CacheEntry<DatasetStats> = {}
 
 function cached<T>(entry: CacheEntry<T>, load: () => Promise<T>, force = false) {
-  if (force) {
-    delete entry.value
-  }
+  if (force) delete entry.value
   if (entry.value !== undefined) return Promise.resolve(entry.value)
   return load().then((value) => {
     entry.value = value
@@ -216,10 +181,7 @@ function cached<T>(entry: CacheEntry<T>, load: () => Promise<T>, force = false) 
   })
 }
 
-interface TrainingRunList {
-  total: number
-  items: TrainingRun[]
-}
+interface TrainingRunList { total: number; items: TrainingRun[] }
 
 export const api = {
   getDatasetStats: ({ signal, force }: RequestOptions = {}) => cached(datasetCache, () => request<RawDatasetStats>('/dataset/stats', { signal }).then(mapDatasetStats), force),
@@ -231,18 +193,24 @@ export const api = {
   createTrainingRun: (config: TrainingConfig, signal?: AbortSignal) => request<TrainingRun>('/training/runs', { method: 'POST', body: JSON.stringify(config), signal }),
   getTrainingRuns: (limit = 20, signal?: AbortSignal) => request<TrainingRunList>(`/training/runs?limit=${limit}`, { signal }),
   getTrainingRun: (id: string, signal?: AbortSignal) => request<TrainingRun>(`/training/runs/${encodeURIComponent(id)}`, { signal }),
-  getProfile: (profileId: string, signal?: AbortSignal) => request<RawProfile>(`/customers/${encodeURIComponent(profileId)}`, { signal }).then(mapProfile),
-  getProfilePurchases: (profileId: string, limit = 8, offset = 0, signal?: AbortSignal) => request<RawPurchaseHistory>(`/customers/${encodeURIComponent(profileId)}/history?limit=${limit}&offset=${offset}`, { signal }).then(mapPurchaseHistory),
-  getRandomProfile: (signal?: AbortSignal) => request<RawProfile>('/customers/random?personalizable=true&model_eligible=true', { signal }).then(mapProfile),
+  getCustomer: (profileId: string, signal?: AbortSignal) => request<RawCustomer>(`/customers/${encodeURIComponent(profileId)}`, { signal }).then(mapCustomer),
+  getCustomerPurchases: (profileId: string, limit = 8, offset = 0, signal?: AbortSignal) => request<RawPurchaseHistory>(`/customers/${encodeURIComponent(profileId)}/history?limit=${limit}&offset=${offset}`, { signal }).then(mapPurchaseHistory),
+  getRandomCustomer: (signal?: AbortSignal) => request<RawCustomer>('/customers/random?personalizable=true&model_eligible=true', { signal }).then(mapCustomer),
   getPopularRecommendations: (k = 10, signal?: AbortSignal) => request<RawRecommendationResult>(`/recommendations/popular?k=${k}`, { signal }).then(mapRecommendationResult),
-  getProfileRecommendations: (profileId: string, k = 10, signal?: AbortSignal) => request<RawRecommendationResult>(`/customers/${encodeURIComponent(profileId)}/recommendations?k=${k}&exclude_seen_articles=true`, { signal }).then(mapRecommendationResult),
+  getCustomerRecommendations: (profileId: string, k = 10, weights: RecommendationWeights, signal?: AbortSignal) => {
+    const query = new URLSearchParams({
+      k: String(k),
+      exclude_seen_articles: 'true',
+      model_weight: String(weights.model),
+      category_weight: String(weights.category),
+      popularity_weight: String(weights.popularity),
+      trend_weight: String(weights.trend),
+    })
+    return request<RawRecommendationResult>(`/customers/${encodeURIComponent(profileId)}/recommendations?${query}`, { signal }).then(mapRecommendationResult)
+  },
 }
 
-export function subscribeToTraining(
-  id: string,
-  onEvent: (event: TrainingEvent) => void,
-  onConnectionError: () => void,
-): () => void {
+export function subscribeToTraining(id: string, onEvent: (event: TrainingEvent) => void, onConnectionError: () => void): () => void {
   const source = new EventSource(`${API_URL}/training/runs/${encodeURIComponent(id)}/events`)
   const receive = (message: MessageEvent<string>) => {
     try {

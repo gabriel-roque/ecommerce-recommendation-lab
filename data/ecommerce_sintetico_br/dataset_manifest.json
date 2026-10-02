@@ -1,0 +1,45 @@
+{
+  "catalog_articles": 500,
+  "catalog_customers": 2000,
+  "currency": "BRL",
+  "dataset": "ecommerce_sintetico_br",
+  "dataset_name": "E-commerce Recommendation Lab",
+  "date_range": {
+    "end": "2025-12-31",
+    "start": "2024-01-01"
+  },
+  "files": {
+    "customers.csv": 2000,
+    "products.csv": 500,
+    "purchases.csv": 47500
+  },
+  "interacting_articles": 500,
+  "interacting_customers": 2000,
+  "locale": "pt-BR",
+  "purchases": 47500,
+  "sampled": false,
+  "schema_version": 2,
+  "seed": 20261001,
+  "semantics": "purchase_only",
+  "source": "gerador determinístico do projeto",
+  "source_files": {
+    "customers.csv": {
+      "bytes": 161545,
+      "rows": 2000,
+      "sha256": "3557208b26e59ff2776ccc856325d9eab6ad83393c5e12ddcb55392d79fed90d"
+    },
+    "products.csv": {
+      "bytes": 89816,
+      "rows": 500,
+      "sha256": "1ed2c0a33a44a81e7f34eb163e69405312747268602d933e949499162c02affe"
+    },
+    "purchases.csv": {
+      "bytes": 1875292,
+      "rows": 47500,
+      "sha256": "b14f3ae496c536655e643f9ec71a749b555cec6eb6347593865e890458972dfc"
+    }
+  },
+  "source_fingerprint": "fee99db8ffc0564d266ae836ce864caff728f7baf149add456b8f71545f53a69",
+  "synthetic": true,
+  "total_records": 50000
+}

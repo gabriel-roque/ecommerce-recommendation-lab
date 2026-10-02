@@ -20,7 +20,17 @@ def test_pipeline_excludes_every_known_positive_from_negative_sampling(monkeypat
     ]
     split = TemporalSplit(purchases[:1], purchases[1:2], purchases[2:])
     customers = [{"customer_key": 1, "age_band": "25-34"}]
-    articles = [{"article_key": key, "product_group_name": "Garments"} for key in (10, 20, 30)]
+    articles = [
+        {
+            "article_key": key,
+            "department_name": "Casa",
+            "category_name": "Cozinha",
+            "subcategory_name": "Utensílio",
+            "brand": "Aurora",
+            "price_band": "econômico",
+        }
+        for key in (10, 20, 30)
+    ]
     datasets = []
     evaluated = []
     seeds = []
@@ -65,7 +75,7 @@ def test_pipeline_excludes_every_known_positive_from_negative_sampling(monkeypat
         customers=customers,
         articles=articles,
         model_version="test",
-        dataset_manifest={"dataset": "hm", "semantics": "purchase_only"},
+        dataset_manifest={"dataset": "ecommerce_sintetico_br", "semantics": "purchase_only", "source_fingerprint": "abc"},
     )
 
     train_index, validation_index = [entry[0] for entry in datasets]

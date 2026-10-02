@@ -1,6 +1,6 @@
-# H&M Recommendation Lab Frontend
+# E-commerce Recommendation Lab Frontend
 
-Interface React para explorar dataset, treino e recomendações H&M. Perfis são pseudônimos. Scores representam relevância relativa, não probabilidade.
+Interface React em PT-BR para explorar conjunto de dados sintético, treino e recomendações de produtos. Valores monetários usam BRL. Pontuações representam força relativa de ranking, não probabilidade de compra nem causalidade.
 
 ## Configuração
 
@@ -27,10 +27,10 @@ npm run build
 - `POST /training/runs`
 - `GET /training/runs`
 - `GET /training/runs/{id}/events` via SSE
-- `GET /profiles/random`
-- `GET /profiles/{profile_id}`
-- `GET /profiles/{profile_id}/purchases?limit=8&offset=0`
-- `GET /profiles/{profile_id}/recommendations?k=10&exclude_purchased_articles=true`
+- `GET /customers/random`
+- `GET /customers/{profile_id}`
+- `GET /customers/{profile_id}/history?limit=8&offset=0`
+- `GET /customers/{profile_id}/recommendations?k=10&exclude_seen_articles=true&model_weight=45&category_weight=30&popularity_weight=15&trend_weight=10`
 - `GET /recommendations/popular?k=10`
 
-Tipos de payload ficam em `src/types/api.ts`.
+Tipos e adaptadores ficam em `src/types/api.ts` e `src/services/api.ts`.

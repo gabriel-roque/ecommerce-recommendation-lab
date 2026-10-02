@@ -25,7 +25,7 @@ def test_hybrid_model_uses_customer_and_article_metadata():
     assert model.get_layer("customer_embedding").output_dim == 2
     assert model.get_layer("article_embedding").output_dim == 2
     assert model.get_layer("age_band_embedding").input_dim == 3
-    assert model.get_layer("product_group_name_embedding").input_dim == 3
+    assert model.get_layer("category_name_embedding").input_dim == 3
     assert model.get_layer("dense_64").units == 5
     assert model.get_layer("dense_32").units == 3
     inputs = {name: np.asarray([1]) for name in FEATURE_NAMES}

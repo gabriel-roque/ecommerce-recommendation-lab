@@ -103,7 +103,7 @@ def _profile_events():
 
 
 def test_profile_sampling_is_deterministic_and_keeps_whole_user_histories():
-    source = {"dataset": "hm", "semantics": "purchase_only", "purchases": 30_000, "sampled": False}
+    source = {"dataset": "ecommerce_sintetico_br", "semantics": "purchase_only", "purchases": 30_000, "sampled": False}
     first, first_manifest = sample_customer_histories(
         _profile_events(), profile="fast", seed=7, source_manifest=source
     )
@@ -123,7 +123,7 @@ def test_profile_sampling_is_deterministic_and_keeps_whole_user_histories():
 
 
 def test_profile_sample_cache_round_trip(tmp_path):
-    source = {"dataset": "hm", "semantics": "purchase_only", "purchases": 30_000, "sampled": False}
+    source = {"dataset": "ecommerce_sintetico_br", "semantics": "purchase_only", "purchases": 30_000, "sampled": False}
     events, manifest = sample_customer_histories(
         _profile_events(), profile="fast", seed=11, source_manifest=source
     )

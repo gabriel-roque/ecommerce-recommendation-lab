@@ -14,20 +14,25 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 class Settings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    app_name: str = "H&M Recommendation Lab"
+    app_name: str = "E-commerce Recommendation Lab"
     database_url: str = "postgresql+psycopg://postgres:postgres@postgres:5432/recommendations"
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    cors_origins: list[str] = Field(
+        default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
+    )
     auto_create_tables: bool = True
     sse_poll_interval_seconds: float = Field(default=0.5, gt=0, le=30)
     require_full_dataset: bool = True
-    dataset_manifest_path: str = str(_PROJECT_ROOT / "data/processed/dataset_manifest.json")
-    dataset_stats_path: str = str(_PROJECT_ROOT / "data/processed/dataset_stats.json")
+    dataset_manifest_path: str = str(
+        _PROJECT_ROOT / "data/ecommerce_sintetico_br/dataset_manifest.json"
+    )
+    dataset_stats_path: str = str(
+        _PROJECT_ROOT / "data/ecommerce_sintetico_br/dataset_stats.json"
+    )
     training_samples_dir: str = str(_PROJECT_ROOT / "data/processed/samples")
     popularity_path: str = str(_PROJECT_ROOT / "data/processed/popularity.json")
     artifacts_dir: str = "artifacts"
     recommendation_cache_ttl_seconds: float = Field(default=30, gt=0, le=3600)
     recommendation_cache_max_entries: int = Field(default=512, ge=1, le=100_000)
-    recommendation_candidate_limit: int = Field(default=20_000, ge=100, le=1_000_000)
     preload_active_model: bool = True
 
     @field_validator("database_url")
@@ -55,10 +60,10 @@ def get_settings() -> Settings:
             origins = origins_value.split(",")
         origins = [origin.strip() for origin in origins if origin.strip()]
     else:
-        origins = ["http://localhost:5173"]
+        origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     return Settings(
-        app_name=os.getenv("APP_NAME", "H&M Recommendation Lab"),
+        app_name=os.getenv("APP_NAME", "E-commerce Recommendation Lab"),
         database_url=os.getenv(
             "DATABASE_URL",
             "postgresql+psycopg://postgres:postgres@postgres:5432/recommendations",
@@ -69,11 +74,11 @@ def get_settings() -> Settings:
         require_full_dataset=_as_bool(os.getenv("REQUIRE_FULL_DATASET"), True),
         dataset_manifest_path=os.getenv(
             "DATASET_MANIFEST_PATH",
-            str(_PROJECT_ROOT / "data/processed/dataset_manifest.json"),
+            str(_PROJECT_ROOT / "data/ecommerce_sintetico_br/dataset_manifest.json"),
         ),
         dataset_stats_path=os.getenv(
             "DATASET_STATS_PATH",
-            str(_PROJECT_ROOT / "data/processed/dataset_stats.json"),
+            str(_PROJECT_ROOT / "data/ecommerce_sintetico_br/dataset_stats.json"),
         ),
         training_samples_dir=os.getenv(
             "TRAINING_SAMPLES_DIR",
@@ -89,9 +94,6 @@ def get_settings() -> Settings:
         ),
         recommendation_cache_max_entries=int(
             os.getenv("RECOMMENDATION_CACHE_MAX_ENTRIES", "512")
-        ),
-        recommendation_candidate_limit=int(
-            os.getenv("RECOMMENDATION_CANDIDATE_LIMIT", "20000")
         ),
         preload_active_model=_as_bool(os.getenv("PRELOAD_ACTIVE_MODEL"), True),
     )

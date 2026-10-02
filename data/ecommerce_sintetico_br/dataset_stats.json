@@ -1,0 +1,143 @@
+{
+  "age_band_counts": {
+    "18-24": 241,
+    "25-34": 335,
+    "35-44": 387,
+    "45-54": 364,
+    "55+": 673
+  },
+  "average_purchases_per_interacting_customer": 23.75,
+  "catalog_articles": 500,
+  "catalog_customers": 2000,
+  "currency": "BRL",
+  "dataset_name": "E-commerce Recommendation Lab",
+  "date_range": {
+    "end": "2025-12-31",
+    "start": "2024-01-01"
+  },
+  "interacting_articles": 500,
+  "interacting_customers": 2000,
+  "median_purchases_per_customer": 18.0,
+  "personas": [
+    "Lucas Almeida",
+    "Mariana Souza",
+    "Rafael Oliveira",
+    "Camila Santos",
+    "Juliana Costa",
+    "Bruno Ferreira"
+  ],
+  "purchases": 47500,
+  "purchases_per_customer": {
+    "0": 0,
+    "1": 0,
+    "101+": 34,
+    "11-50": 1689,
+    "2-5": 6,
+    "51-100": 100,
+    "6-10": 171
+  },
+  "semantics": "purchase_only",
+  "source_fingerprint": "fee99db8ffc0564d266ae836ce864caff728f7baf149add456b8f71545f53a69",
+  "top_articles": [
+    {
+      "article_id": "PROD00001",
+      "product_name": "Notebook Essencial 001",
+      "purchases": 2218
+    },
+    {
+      "article_id": "PROD00012",
+      "product_name": "Panela Prático 012",
+      "purchases": 1765
+    },
+    {
+      "article_id": "PROD00005",
+      "product_name": "Romance brasileiro Conforto 005",
+      "purchases": 1717
+    },
+    {
+      "article_id": "PROD00019",
+      "product_name": "Periférico para jogos Essencial 019",
+      "purchases": 1472
+    },
+    {
+      "article_id": "PROD00006",
+      "product_name": "Livro didático Prático 006",
+      "purchases": 1221
+    },
+    {
+      "article_id": "PROD00016",
+      "product_name": "Hidratante Premium 016",
+      "purchases": 1153
+    },
+    {
+      "article_id": "PROD00009",
+      "product_name": "Tênis esportivo Compacto 009",
+      "purchases": 997
+    },
+    {
+      "article_id": "PROD00002",
+      "product_name": "Acessório para computador Clássico 002",
+      "purchases": 992
+    },
+    {
+      "article_id": "PROD00020",
+      "product_name": "Jogo de tabuleiro Clássico 020",
+      "purchases": 890
+    },
+    {
+      "article_id": "PROD00022",
+      "product_name": "Camiseta Premium 022",
+      "purchases": 858
+    },
+    {
+      "article_id": "PROD00024",
+      "product_name": "Café Prático 024",
+      "purchases": 857
+    },
+    {
+      "article_id": "PROD00013",
+      "product_name": "Utensílio Essencial 013",
+      "purchases": 785
+    },
+    {
+      "article_id": "PROD00010",
+      "product_name": "Equipamento de exercício Premium 010",
+      "purchases": 725
+    },
+    {
+      "article_id": "PROD00007",
+      "product_name": "Caderno Essencial 007",
+      "purchases": 721
+    },
+    {
+      "article_id": "PROD00017",
+      "product_name": "Batom Conforto 017",
+      "purchases": 715
+    },
+    {
+      "article_id": "PROD00004",
+      "product_name": "Fone de ouvido Premium 004",
+      "purchases": 684
+    },
+    {
+      "article_id": "PROD00003",
+      "product_name": "Celular Compacto 003",
+      "purchases": 625
+    },
+    {
+      "article_id": "PROD00015",
+      "product_name": "Organizador Compacto 015",
+      "purchases": 616
+    },
+    {
+      "article_id": "PROD00023",
+      "product_name": "Sapato Conforto 023",
+      "purchases": 614
+    },
+    {
+      "article_id": "PROD00011",
+      "product_name": "Bola Conforto 011",
+      "purchases": 576
+    }
+  ]
+}

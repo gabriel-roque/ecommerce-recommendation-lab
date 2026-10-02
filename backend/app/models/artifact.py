@@ -15,8 +15,9 @@ from .features import HybridFeatures
 from .mappings import DenseMappings
 from .ncf import require_tensorflow
 
-ARTIFACT_FORMAT = "hm-hybrid"
-ARTIFACT_VERSION = 1
+ARTIFACT_FORMAT = "ecommerce-hybrid"
+ARTIFACT_VERSION = 2
+DATASET_ID = "ecommerce_sintetico_br"
 
 
 def _json_value(value: Any) -> Any:
@@ -67,10 +68,12 @@ def save_artifact(
     overwrite: bool = False,
 ) -> Path:
     """Write all required files, exposing destination only after success."""
-    if dataset_manifest.get("dataset") != "hm":
-        raise ValueError("Only H&M dataset artifacts can be saved")
+    if dataset_manifest.get("dataset") != DATASET_ID:
+        raise ValueError("Only ecommerce_sintetico_br artifacts can be saved")
     if dataset_manifest.get("semantics") != "purchase_only":
-        raise ValueError("H&M artifact requires purchase-only dataset semantics")
+        raise ValueError("Artifact requires purchase-only dataset semantics")
+    if not dataset_manifest.get("source_fingerprint"):
+        raise ValueError("Artifact requires dataset source_fingerprint")
     destination = Path(directory)
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.parent / f".{destination.name}.{uuid.uuid4().hex}.tmp"
@@ -81,7 +84,7 @@ def save_artifact(
         features.save(temporary)
         _write_json(
             temporary / "artifact_manifest.json",
-            {"format": ARTIFACT_FORMAT, "version": ARTIFACT_VERSION, "dataset": "hm"},
+            {"format": ARTIFACT_FORMAT, "version": ARTIFACT_VERSION, "dataset": DATASET_ID},
         )
         _write_json(temporary / "config.json", config)
         _write_json(temporary / "metrics.json", metrics)
@@ -105,10 +108,10 @@ def load_artifact(directory: str | Path, *, compile_model: bool = False) -> Load
         with (path / "artifact_manifest.json").open(encoding="utf-8") as stream:
             artifact_manifest = json.load(stream)
     except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError("Artifact is not an H&M hybrid artifact") from exc
-    expected = {"format": ARTIFACT_FORMAT, "version": ARTIFACT_VERSION, "dataset": "hm"}
+        raise ValueError("Artifact is not an ecommerce hybrid artifact") from exc
+    expected = {"format": ARTIFACT_FORMAT, "version": ARTIFACT_VERSION, "dataset": DATASET_ID}
     if artifact_manifest != expected:
-        raise ValueError("Unsupported or non-H&M artifact format")
+        raise ValueError("Unsupported ecommerce artifact format")
     tensorflow = require_tensorflow()
     model = tensorflow.keras.models.load_model(path / "model.keras", compile=compile_model)
     mappings = DenseMappings.load(path)
@@ -125,8 +128,12 @@ def load_artifact(directory: str | Path, *, compile_model: bool = False) -> Load
     if training_manifest_path.is_file():
         with training_manifest_path.open(encoding="utf-8") as stream:
             training_manifest = json.load(stream)
-    if manifest.get("dataset") != "hm" or manifest.get("semantics") != "purchase_only":
-        raise ValueError("Artifact dataset manifest is not purchase-only H&M")
+    if (
+        manifest.get("dataset") != DATASET_ID
+        or manifest.get("semantics") != "purchase_only"
+        or not manifest.get("source_fingerprint")
+    ):
+        raise ValueError("Artifact dataset manifest is invalid")
     return LoadedArtifact(
         model, mappings, features, config, metrics, manifest, path, training_manifest
     )

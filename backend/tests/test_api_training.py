@@ -75,9 +75,9 @@ def test_training_profiles_endpoint(client):
     payload = response.json()
     assert payload["default"] == "balanced"
     assert {item["name"]: item["target_purchases"] for item in payload["profiles"]} == {
-        "fast": 25_000,
-        "balanced": 100_000,
-        "extensive": 250_000,
+        "fast": 10_000,
+        "balanced": 25_000,
+        "extensive": 40_000,
         "full": None,
     }
 
@@ -87,8 +87,11 @@ def test_full_dataset_requirement_checks_manifest_and_database(client, tmp_path,
     manifest.write_text(
         json.dumps(
             {
-                "dataset": "hm",
+                "dataset": "ecommerce_sintetico_br",
                 "semantics": "purchase_only",
+                "synthetic": True,
+                "currency": "BRL",
+                "source_fingerprint": "abc",
                 "catalog_customers": 2,
                 "catalog_articles": 2,
                 "purchases": 1,
@@ -114,8 +117,11 @@ def test_full_dataset_runs_lightweight_preflight(client, db, tmp_path, monkeypat
     manifest.write_text(
         json.dumps(
             {
-                "dataset": "hm",
+                "dataset": "ecommerce_sintetico_br",
                 "semantics": "purchase_only",
+                "synthetic": True,
+                "currency": "BRL",
+                "source_fingerprint": "abc",
                 "catalog_customers": 2,
                 "catalog_articles": 2,
                 "purchases": 3,

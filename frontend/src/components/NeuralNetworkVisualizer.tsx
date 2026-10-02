@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react'
-import { profileAlias } from '../aliases'
 import type { NetworkConnection, NetworkSnapshot } from '../types/api'
 import { formatDate, formatDecimal } from '../utils'
 
@@ -42,7 +41,7 @@ export function NeuralNetworkVisualizer({ snapshot, denseSizes = [64, 32] }: { s
   if (!snapshot) {
     return (
       <div className="grid min-h-[330px] place-items-center border-2 border-dashed bg-paper/60 p-8 text-center">
-        <div><p className="font-bold">Ativações aguardando primeiro snapshot</p><p className="mt-2 max-w-md text-sm leading-6 text-slate-600">O desenho aparece somente quando o trainer enviar valores reais do probe pela conexão SSE.</p></div>
+        <div><p className="font-bold">Ativações aguardando primeira amostra técnica</p><p className="mt-2 max-w-md text-sm leading-6 text-slate-600">O desenho aparece somente quando o processo de treino enviar valores medidos pela conexão de eventos.</p></div>
       </div>
     )
   }
@@ -57,7 +56,7 @@ export function NeuralNetworkVisualizer({ snapshot, denseSizes = [64, 32] }: { s
     .sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight))
     .slice(0, 48)
   const animatedConnections = new Set(connections.slice(0, 8).map(connectionKey))
-  const alias = snapshot.probe_profile_id == null ? null : profileAlias(snapshot.probe_profile_id)
+  const customerName = snapshot.probe_customer_name ?? null
 
   const toggleAnimation = () => {
     const next = !playing
@@ -79,9 +78,9 @@ export function NeuralNetworkVisualizer({ snapshot, denseSizes = [64, 32] }: { s
     <div className="min-w-0">
       <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div className="flex min-w-0 flex-wrap gap-2 font-mono text-[10px] uppercase tracking-wider">
-          <span className="max-w-full break-words border bg-white px-2 py-1">Probe profile #{snapshot.probe_profile_id ?? 'não informado'}{alias && ` · ${alias} (pseudônimo)`}</span>
-          <span className="border bg-white px-2 py-1">Probe article #{snapshot.probe_article_id ?? 'não informado'}</span>
-          <span className="border bg-white px-2 py-1">Epoch {snapshot.epoch}</span>
+          <span className="max-w-full break-words border bg-white px-2 py-1">Cliente da amostra #{snapshot.probe_profile_id ?? 'não informado'}{customerName && ` · ${customerName} (sintético)`}</span>
+          <span className="border bg-white px-2 py-1">Produto da amostra #{snapshot.probe_article_id ?? 'não informado'}</span>
+          <span className="border bg-white px-2 py-1">Época {snapshot.epoch}</span>
           <time className="border bg-white px-2 py-1" dateTime={snapshot.timestamp}>{formatDate(snapshot.timestamp)}</time>
         </div>
         <button type="button" className="button-secondary shrink-0" onClick={toggleAnimation} disabled={reducedMotion} aria-pressed={!playing}>
@@ -92,7 +91,7 @@ export function NeuralNetworkVisualizer({ snapshot, denseSizes = [64, 32] }: { s
       <div className={`network-canvas overflow-hidden border-2 bg-[#080808] ${playing ? '' : 'network-paused'}`}>
         <svg ref={svgRef} className="block h-auto w-full" viewBox="0 0 960 405" role="img" aria-labelledby="network-title" aria-describedby="network-description">
           <title id="network-title">Ativações e pesos reais da rede neural</title>
-          <desc id="network-description">Constelação em camadas com ativações do snapshot, até 48 pesos mais fortes e score do probe. Partículas ilustram fluxo, sem representar valores adicionais.</desc>
+           <desc id="network-description">Camadas com ativações da amostra técnica, até 48 pesos de maior magnitude e saída numérica. Partículas ilustram fluxo. Este retrato não explica recomendação individual.</desc>
           <defs>
             <pattern id="network-grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#26304d" strokeWidth=".6" /></pattern>
             <radialGradient id="network-vignette"><stop offset="0" stopColor="#331015" /><stop offset="1" stopColor="#080808" /></radialGradient>
@@ -115,26 +114,26 @@ export function NeuralNetworkVisualizer({ snapshot, denseSizes = [64, 32] }: { s
           })}
 
           <g className="font-mono text-[10px] font-medium uppercase tracking-wider" fill="#dfe4f2">
-            <text x="92" y="30" textAnchor="middle">Profile embed.</text><text x="238" y="30" textAnchor="middle">Article embed.</text>
-             <text x="470" y="24" textAnchor="middle">Dense {denseSizes[0]}</text><text x="700" y="68" textAnchor="middle">Dense {denseSizes[1]}</text><text x="880" y="166" textAnchor="middle">Score</text>
+            <text x="92" y="30" textAnchor="middle">Vetor cliente</text><text x="238" y="30" textAnchor="middle">Vetor produto</text>
+             <text x="470" y="24" textAnchor="middle">Densa {denseSizes[0]}</text><text x="700" y="68" textAnchor="middle">Densa {denseSizes[1]}</text><text x="880" y="166" textAnchor="middle">Saída</text>
           </g>
-          {renderNodes('profile_embedding', snapshot.profile_embedding, 'Profile embedding')}
-          {renderNodes('article_embedding', snapshot.article_embedding, 'Article embedding')}
-           {renderNodes('dense_64', snapshot.dense_64, `Dense ${denseSizes[0]} ativação`)}
-           {renderNodes('dense_32', snapshot.dense_32, `Dense ${denseSizes[1]} ativação`)}
-          <Node {...layerPoints.output[0]} activation={snapshot.output_score} label="Score de relevância" nodeKey="output-0" focused={focusedNode === 'output-0'} onFocus={setFocusedNode} />
+          {renderNodes('profile_embedding', snapshot.profile_embedding, 'Vetor do cliente')}
+          {renderNodes('article_embedding', snapshot.article_embedding, 'Vetor do produto')}
+           {renderNodes('dense_64', snapshot.dense_64, `Camada densa ${denseSizes[0]}, ativação`)}
+           {renderNodes('dense_32', snapshot.dense_32, `Camada densa ${denseSizes[1]}, ativação`)}
+          <Node {...layerPoints.output[0]} activation={snapshot.output_score} label="Saída numérica da amostra" nodeKey="output-0" focused={focusedNode === 'output-0'} onFocus={setFocusedNode} />
           <text x="880" y="250" textAnchor="middle" className="font-mono text-xl font-medium" fill="#f8fafc">{formatDecimal(snapshot.output_score, 3)}</text>
         </svg>
       </div>
 
       <div className="mt-3 grid gap-3 text-xs leading-5 text-slate-600 sm:grid-cols-[1fr_auto] sm:items-start">
-        <p className="border-l-4 border-cobalt pl-3"><strong>Valores reais, movimento ilustrativo.</strong> Tamanho e brilho seguem magnitude da ativação. Linhas mostram somente os 48 pesos visíveis mais fortes.</p>
+        <p className="border-l-4 border-cobalt pl-3"><strong>Amostra técnica, não explicação individual.</strong> Tamanho e brilho seguem magnitude da ativação. Linhas mostram até 48 pesos de maior magnitude. Movimento é ilustrativo.</p>
         <div className="flex gap-3 font-mono text-[10px] uppercase"><span><i className="mr-1 inline-block size-2 bg-[#e50010]" /> positivo</span><span><i className="mr-1 inline-block size-2 bg-[#777777]" /> negativo</span></div>
       </div>
       <details className="mt-4 border-2 bg-white p-3 text-sm">
-        <summary className="min-h-11 cursor-pointer py-3 font-bold">Tabela acessível do snapshot</summary>
+        <summary className="min-h-11 cursor-pointer py-3 font-bold">Tabela acessível da amostra técnica</summary>
         <div className="overflow-x-auto"><table className="w-full min-w-[420px] text-left"><caption className="sr-only">Valores reais de ativação por camada</caption><thead><tr className="border-b-2"><th className="p-2">Camada</th><th className="p-2">Índice</th><th className="p-2">Ativação</th></tr></thead><tbody>{([
-          ['Profile embedding', snapshot.profile_embedding], ['Article embedding', snapshot.article_embedding], [`Dense ${denseSizes[0]}`, snapshot.dense_64], [`Dense ${denseSizes[1]}`, snapshot.dense_32], ['Output', [snapshot.output_score]],
+          ['Vetor do cliente', snapshot.profile_embedding], ['Vetor do produto', snapshot.article_embedding], [`Camada densa ${denseSizes[0]}`, snapshot.dense_64], [`Camada densa ${denseSizes[1]}`, snapshot.dense_32], ['Saída', [snapshot.output_score]],
         ] as Array<[string, number[]]>).flatMap(([layer, values]) => values.map((value, index) => <tr className="border-b" key={`${layer}-${index}`}><td className="p-2">{layer}</td><td className="p-2 font-mono">{index}</td><td className="p-2 font-mono">{formatDecimal(value, 5)}</td></tr>))}</tbody></table></div>
       </details>
     </div>

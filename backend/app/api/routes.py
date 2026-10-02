@@ -7,7 +7,7 @@ import secrets
 import shutil
 import time
 from collections.abc import AsyncIterator, Sequence
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path as FilePath
 from typing import Annotated, Any
 
@@ -38,6 +38,7 @@ from app.api.schemas import (
     RecommendationItem,
     RecommendationResponse,
     RecommendationEvidence,
+    RecommendationComponent,
     ScoreSemanticsResponse,
     TrainingConfig,
     TrainingMetricResponse,
@@ -82,19 +83,24 @@ def _load_dataset_manifest(path: str) -> tuple[dict[str, Any] | None, str | None
         with FilePath(path).open(encoding="utf-8") as stream:
             manifest = json.load(stream)
     except (OSError, json.JSONDecodeError) as exc:
-        return None, f"Dataset manifest unavailable: {exc}"
+        return None, f"Manifesto do dataset indisponível: {exc}"
 
     required_counts = ("catalog_customers", "catalog_articles", "purchases")
     if not isinstance(manifest, dict):
-        return None, "Dataset manifest must be a JSON object"
+        return None, "Manifesto do dataset deve ser um objeto JSON"
     if type(manifest.get("sampled")) is not bool:
-        return None, "Dataset manifest sampled flag is invalid"
-    if manifest.get("dataset") != "hm" or manifest.get("semantics") != "purchase_only":
-        return None, "Dataset manifest is not H&M"
+        return None, "Campo sampled do manifesto é inválido"
+    if (
+        manifest.get("dataset") != "ecommerce_sintetico_br"
+        or manifest.get("semantics") != "purchase_only"
+        or manifest.get("synthetic") is not True
+        or manifest.get("currency") != "BRL"
+    ):
+        return None, "Manifesto não identifica ecommerce_sintetico_br"
     for name in required_counts:
         value = manifest.get(name)
         if type(value) is not int or value < 0:
-            return None, f"Dataset manifest {name} count is invalid"
+            return None, f"Contagem {name} do manifesto é inválida"
     return manifest, None
 
 
@@ -109,7 +115,7 @@ def _dataset_validation(
     if manifest is None:
         return False, error
     if manifest["sampled"]:
-        return False, "Dataset manifest identifies a sampled dataset"
+        return False, "Manifesto identifica dataset amostrado"
 
     actual = {"purchases": purchases, "catalog_customers": customers, "catalog_articles": articles}
     expected = {
@@ -119,7 +125,7 @@ def _dataset_validation(
     }
     mismatches = [name for name, value in expected.items() if actual.get(name, 0) != value]
     if mismatches:
-        return False, f"Database does not match dataset manifest: {', '.join(mismatches)}"
+        return False, f"Banco não corresponde ao manifesto: {', '.join(mismatches)}"
     return True, None
 
 
@@ -266,11 +272,19 @@ def dataset_stats(db: DbSession) -> DatasetStatsResponse:
         )
     }
     top_articles = [
-        {"article_id": str(article_id), "purchases": int(purchases)}
-        for article_id, purchases in db.execute(
-            select(Article.article_id, func.count(Purchase.id).label("purchases"))
+        {
+            "article_id": str(article_id),
+            "product_name": str(product_name),
+            "purchases": int(purchases),
+        }
+        for article_id, product_name, purchases in db.execute(
+            select(
+                Article.article_id,
+                Article.product_name,
+                func.count(Purchase.id).label("purchases"),
+            )
             .join(Purchase, Purchase.article_key == Article.article_key)
-            .group_by(Article.article_id)
+            .group_by(Article.article_id, Article.product_name)
             .order_by(desc("purchases"), Article.article_id)
             .limit(10)
         )
@@ -375,6 +389,7 @@ def _snapshot_response(
         epoch=snapshot.epoch,
         timestamp=snapshot.created_at,
         probe_profile_id=(_profile_id(customer) if customer is not None else None),
+        probe_customer_name=(customer.name if customer is not None else None),
         probe_article_id=(str(article.article_id) if article is not None else None),
         profile_embedding=activation("customer_tower"),
         article_embedding=activation("article_tower"),
@@ -782,12 +797,11 @@ def _article_response(article: Article) -> ArticleResponse:
     return ArticleResponse(
         article_id=str(article.article_id),
         product_name=article.product_name,
-        product_type_name=article.product_type_name,
-        product_group_name=article.product_group_name,
-        colour_group_name=article.colour_group_name,
         department_name=article.department_name,
-        section_name=article.section_name,
-        garment_group_name=article.garment_group_name,
+        category_name=article.category_name,
+        subcategory_name=article.subcategory_name,
+        brand=article.brand,
+        price_band=article.price_band,
         detail_desc=article.detail_desc,
     )
 
@@ -807,7 +821,10 @@ def _customer_response(db: Session, customer: Customer) -> CustomerResponse:
     purchase_count = int(row[0] or 0)
     return CustomerResponse(
         profile_id=_profile_id(customer),
+        name=customer.name,
         age_band=customer.age_band,
+        state=customer.state,
+        region=customer.region,
         purchase_count=purchase_count,
         first_purchase_date=row[1],
         last_purchase_date=row[2],
@@ -937,30 +954,40 @@ def _popular_rows(
     excluded_article_keys: set[int] | None = None,
 ) -> list[tuple[int, float]]:
     purchase_count = func.count(Purchase.id).label("purchase_count")
-    query = select(Purchase.article_key, purchase_count).group_by(Purchase.article_key)
-    if excluded_article_keys:
-        query = query.where(Purchase.article_key.not_in(excluded_article_keys))
-    rows = list(
-        db.execute(query.order_by(desc(purchase_count), Purchase.article_key).limit(k))
+    query = (
+        select(Purchase.article_key, purchase_count)
+        .group_by(Purchase.article_key)
+        .order_by(desc(purchase_count), Purchase.article_key)
     )
-    maximum = int(rows[0][1]) if rows else 0
+    all_rows = list(db.execute(query))
+    rows = [
+        row
+        for row in all_rows
+        if not excluded_article_keys or int(row[0]) not in excluded_article_keys
+    ][:k]
+    maximum = int(all_rows[0][1]) if all_rows else 0
     return [
-        (int(article_key), float(count) / maximum)
+        (int(article_key), math.log1p(int(count)) / math.log1p(maximum))
         for article_key, count in rows
         if maximum
     ]
 
 
-def _recommendation_items(
+def _grade(score: float) -> str:
+    if score < 45:
+        return "baixo"
+    if score < 65:
+        return "medio"
+    if score < 80:
+        return "alto"
+    return "muito_alto"
+
+
+def _popular_items(
     db: Session,
-    customer: Customer | None,
     rows: Sequence[tuple[int, float]],
-    history_articles: dict[int, Article],
-    *,
-    strategy: str,
 ) -> list[RecommendationItem]:
-    recommendation_rows = rows
-    item_keys = {item_key for item_key, _ in recommendation_rows}
+    item_keys = {item_key for item_key, _ in rows}
     articles = {
         article.article_key: article
         for article in db.scalars(select(Article).where(Article.article_key.in_(item_keys)))
@@ -977,75 +1004,37 @@ def _recommendation_items(
             .group_by(Purchase.article_key)
         )
     }
-    cohort_counts: dict[int, int] = {}
-    age_band = (
-        customer.age_band
-        if customer is not None
-        else None
-    )
-    if age_band and item_keys:
-        age_column = _age_band_column()
-        cohort_rows = db.execute(
-            select(Purchase.article_key, func.count(func.distinct(Purchase.customer_key)))
-            .join(Customer, Customer.customer_key == Purchase.customer_key)
-            .where(age_column == age_band, Purchase.article_key.in_(item_keys))
-            .group_by(Purchase.article_key)
-        )
-        cohort_counts = {int(article_key): int(count) for article_key, count in cohort_rows}
-    history_by_department: dict[str, list[str]] = {}
-    for article in history_articles.values():
-        if article.department_name:
-            history_by_department.setdefault(article.department_name, []).append(
-                str(article.article_id)
-            )
     output: list[RecommendationItem] = []
-    for item_key, score in recommendation_rows:
+    for item_key, raw_score in rows:
         article = articles.get(item_key)
         if article is None:
             continue
-        reasons: list[RecommendationEvidence] = []
         purchases, buyers = purchase_counts.get(item_key, (0, 0))
-        if strategy == "model":
-            reasons.append(
-                RecommendationEvidence(
-                    kind="model_score",
-                    description="Active model assigned this ranking score.",
-                )
-            )
-        else:
-            reasons.append(
-                RecommendationEvidence(
-                    kind="global_popularity",
-                    description="Observed purchase count in this dataset.",
-                    purchase_count=purchases,
-                    customer_count=buyers,
-                )
-            )
-        related_ids = history_by_department.get(article.department_name or "", [])
-        if related_ids:
-            reasons.append(
-                RecommendationEvidence(
-                    kind="purchase_history_department",
-                    description="Article shares a catalog department with purchase history.",
-                    related_article_ids=sorted(related_ids),
-                )
-            )
-        cohort_buyers = cohort_counts.get(item_key, 0)
-        if cohort_buyers:
-            reasons.append(
-                RecommendationEvidence(
-                    kind="age_band_popularity",
-                    description="Distinct buyers observed in profile age band.",
-                    customer_count=cohort_buyers,
-                )
-            )
+        score = raw_score * 100
         output.append(
             RecommendationItem(
                 rank=len(output) + 1,
                 article_id=str(article.article_id),
                 score=score,
+                grade=_grade(score),
                 article=_article_response(article),
-                evidence=reasons,
+                evidence=[
+                    RecommendationEvidence(
+                        kind="global_popularity",
+                        description=f"Produto registrou {purchases} compras no dataset.",
+                        purchase_count=purchases,
+                        customer_count=buyers,
+                    )
+                ],
+                breakdown={
+                    "popularity": RecommendationComponent(
+                        raw_score=raw_score,
+                        weight=100,
+                        contribution=score,
+                        label="Popularidade",
+                        explanation=f"{purchases} compras observadas; normalização logarítmica pelo produto mais comprado.",
+                    )
+                },
             )
         )
     return output
@@ -1055,44 +1044,43 @@ def _popularity_semantics() -> ScoreSemanticsResponse:
     return ScoreSemanticsResponse(
         name="normalized_purchase_popularity",
         description=(
-            "Observed purchase count divided by the highest count among eligible articles; "
-            "not a purchase probability or causal effect."
+            "Popularidade observada com normalização logarítmica, em escala de 0 a 100. "
+            "Não representa probabilidade de compra nem efeito causal."
         ),
     )
 
 
 def _model_semantics() -> ScoreSemanticsResponse:
     return ScoreSemanticsResponse(
-        name="model_ranking_score",
+        name="hybrid_ranking_score",
         description=(
-            "Model output used only for ranking; not a calibrated purchase probability or causal effect."
+            "Score de ranking entre 0 e 100 composto por modelo, afinidade de categoria, "
+            "popularidade e tendência. Não representa probabilidade nem efeito causal."
         ),
     )
 
 
 def _assert_model_dataset_matches(db: Session, model: ModelVersion) -> None:
+    del db
     manifest_path = FilePath(model.artifact_path) / "dataset_manifest.json"
     if not manifest_path.is_file():
-        return
+        raise HTTPException(status_code=409, detail="Artefato do modelo não contém manifesto do dataset")
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise HTTPException(status_code=409, detail="Active model dataset metadata is invalid") from exc
-    actual = {
-        "purchases": int(db.scalar(select(func.count(Purchase.id))) or 0),
-        "catalog_customers": int(db.scalar(select(func.count(Customer.customer_key))) or 0),
-        "catalog_articles": int(db.scalar(select(func.count(Article.article_key))) or 0),
-    }
+        raise HTTPException(status_code=409, detail="Metadados do dataset do modelo são inválidos") from exc
+    current, error = _load_dataset_manifest(get_settings().dataset_manifest_path)
     if (
         not isinstance(manifest, dict)
-        or manifest.get("dataset") != "hm"
+        or current is None
+        or manifest.get("dataset") != "ecommerce_sintetico_br"
         or manifest.get("semantics") != "purchase_only"
         or manifest.get("sampled") is not False
-        or any(manifest.get(name) != value for name, value in actual.items())
+        or manifest.get("source_fingerprint") != current.get("source_fingerprint")
     ):
         raise HTTPException(
             status_code=409,
-            detail="Active model artifact does not match current H&M dataset",
+            detail=f"Modelo ativo não corresponde ao dataset atual{': ' + error if error else ''}",
         )
 
 
@@ -1109,7 +1097,167 @@ def _normalize_backend_rows(
         if not math.isfinite(score) or not 0 <= score <= 1:
             raise HTTPException(status_code=502, detail="Recommendation model returned invalid scores")
         normalized[article_key] = max(score, normalized.get(article_key, 0.0))
-    return sorted(normalized.items(), key=lambda item: (-item[1], item[0]))[:k]
+    return sorted(normalized.items(), key=lambda item: (-item[1], item[0]))
+
+
+def _hybrid_items(
+    db: Session,
+    customer: Customer,
+    model_rows: Sequence[tuple[int, float]],
+    seen_keys: set[int],
+    *,
+    k: int,
+    exclude_seen_articles: bool,
+    weights: dict[str, float],
+) -> list[RecommendationItem]:
+    articles = list(db.scalars(select(Article).order_by(Article.article_key)))
+    if exclude_seen_articles:
+        articles = [article for article in articles if article.article_key not in seen_keys]
+    candidate_keys = {article.article_key for article in articles}
+    model_scores = {key: score for key, score in model_rows if key in candidate_keys}
+
+    catalog_counts = {
+        int(article_key): int(count)
+        for article_key, count in db.execute(
+            select(Purchase.article_key, func.count(Purchase.id)).group_by(Purchase.article_key)
+        )
+    }
+    maximum_count = max(catalog_counts.values(), default=0)
+    maximum_date = db.scalar(select(func.max(Purchase.t_dat)))
+    recent_counts: dict[int, int] = {}
+    if maximum_date is not None:
+        recent_counts = {
+            int(article_key): int(count)
+            for article_key, count in db.execute(
+                select(Purchase.article_key, func.count(Purchase.id))
+                .where(Purchase.t_dat >= maximum_date - timedelta(days=29))
+                .group_by(Purchase.article_key)
+            )
+        }
+    maximum_recent = max(recent_counts.values(), default=0)
+    department_counts: dict[str, int] = {}
+    category_counts: dict[str, int] = {}
+    pair_counts: dict[tuple[str, str], int] = {}
+    history_ids: dict[str, list[str]] = {}
+    total_customer_purchases = 0
+    for department, category, article_id, count in db.execute(
+        select(
+            Article.department_name,
+            Article.category_name,
+            Article.article_id,
+            func.count(Purchase.id),
+        )
+        .join(Purchase, Purchase.article_key == Article.article_key)
+        .where(Purchase.customer_key == customer.customer_key)
+        .group_by(Article.department_name, Article.category_name, Article.article_id)
+    ):
+        value = int(count)
+        total_customer_purchases += value
+        department_counts[str(department)] = department_counts.get(str(department), 0) + value
+        category_counts[str(category)] = category_counts.get(str(category), 0) + value
+        pair = (str(department), str(category))
+        pair_counts[pair] = pair_counts.get(pair, 0) + value
+        history_ids.setdefault(str(department), []).append(str(article_id))
+
+    ranked: list[tuple[float, int, RecommendationItem]] = []
+    for article in articles:
+        model_raw = model_scores.get(article.article_key, 0.0)
+        department_count = department_counts.get(article.department_name, 0)
+        category_count = category_counts.get(article.category_name, 0)
+        broad_category_count = (
+            department_count
+            + category_count
+            - pair_counts.get((article.department_name, article.category_name), 0)
+        )
+        category_raw = (
+            broad_category_count / total_customer_purchases if total_customer_purchases else 0.0
+        )
+        purchases = catalog_counts.get(article.article_key, 0)
+        recent = recent_counts.get(article.article_key, 0)
+        popularity_raw = (
+            math.log1p(purchases) / math.log1p(maximum_count) if maximum_count else 0.0
+        )
+        trend_raw = math.log1p(recent) / math.log1p(maximum_recent) if maximum_recent else 0.0
+        raw_values = {
+            "model": model_raw,
+            "category": category_raw,
+            "popularity": popularity_raw,
+            "trend": trend_raw,
+        }
+        contributions = {name: weights[name] * raw for name, raw in raw_values.items()}
+        score = min(100.0, max(0.0, sum(contributions.values())))
+        breakdown = {
+            "model": RecommendationComponent(
+                raw_score=model_raw,
+                weight=weights["model"],
+                contribution=contributions["model"],
+                label="Afinidade do modelo",
+                explanation="Saída neural usada somente para ordenar produtos; não é probabilidade.",
+            ),
+            "category": RecommendationComponent(
+                raw_score=category_raw,
+                weight=weights["category"],
+                contribution=contributions["category"],
+                label="Afinidade de categoria",
+                explanation=(
+                    f"{broad_category_count} de {total_customer_purchases} compras do cliente ocorreram "
+                    f"no departamento {article.department_name} ou na categoria {article.category_name}."
+                ),
+            ),
+            "popularity": RecommendationComponent(
+                raw_score=popularity_raw,
+                weight=weights["popularity"],
+                contribution=contributions["popularity"],
+                label="Popularidade",
+                explanation=f"{purchases} compras observadas no catálogo, com normalização logarítmica.",
+            ),
+            "trend": RecommendationComponent(
+                raw_score=trend_raw,
+                weight=weights["trend"],
+                contribution=contributions["trend"],
+                label="Tendência recente",
+                explanation=(
+                    f"{recent} compras nos 30 dias até {maximum_date.isoformat() if maximum_date else 'a última data do dataset'}, "
+                    "com normalização logarítmica."
+                ),
+            ),
+        }
+        related = sorted(set(history_ids.get(article.department_name, [])))
+        evidence = [
+            RecommendationEvidence(
+                kind="model_score",
+                description="Modelo neural forneceu sinal de afinidade apenas para ranking.",
+            )
+        ]
+        if related:
+            evidence.append(
+                RecommendationEvidence(
+                    kind="purchase_history_department",
+                    description=f"Histórico contém compras no departamento {article.department_name}.",
+                    purchase_count=department_count,
+                    related_article_ids=related,
+                )
+            )
+        ranked.append(
+            (
+                score,
+                article.article_key,
+                RecommendationItem(
+                    rank=1,
+                    article_id=article.article_id,
+                    score=score,
+                    grade=_grade(score),
+                    article=_article_response(article),
+                    evidence=evidence,
+                    breakdown=breakdown,
+                ),
+            )
+        )
+    ranked.sort(key=lambda value: (-value[0], value[1]))
+    output = [item for _, _, item in ranked[:k]]
+    for rank, item in enumerate(output, 1):
+        item.rank = rank
+    return output
 
 
 @router.get(
@@ -1126,9 +1274,10 @@ def popular_recommendations(
     return RecommendationResponse(
         strategy="popularity",
         score_semantics=_popularity_semantics(),
+        applied_weights={"model": 0, "category": 0, "popularity": 100, "trend": 0},
         exclude_seen_articles=False,
         inference_duration_ms=(time.perf_counter() - started) * 1000,
-        items=_recommendation_items(db, None, rows, {}, strategy="popularity"),
+        items=_popular_items(db, rows),
     )
 
 
@@ -1143,8 +1292,20 @@ def customer_recommendations(
     backend: Annotated[RecommendationBackend, Depends(get_recommendation_backend)],
     k: Annotated[int, Query(ge=1, le=100)] = 10,
     exclude_seen_articles: bool = True,
+    model_weight: Annotated[float, Query(ge=0, le=100)] = 45,
+    category_weight: Annotated[float, Query(ge=0, le=100)] = 30,
+    popularity_weight: Annotated[float, Query(ge=0, le=100)] = 15,
+    trend_weight: Annotated[float, Query(ge=0, le=100)] = 10,
 ) -> RecommendationResponse:
     started = time.perf_counter()
+    requested_weights = {
+        "model": model_weight,
+        "category": category_weight,
+        "popularity": popularity_weight,
+        "trend": trend_weight,
+    }
+    if not math.isclose(sum(requested_weights.values()), 100.0, abs_tol=1e-9):
+        raise HTTPException(status_code=422, detail="A soma dos quatro pesos deve ser 100")
     customer = _get_customer(db, profile_id)
     seen_keys = set(
         db.scalars(
@@ -1153,10 +1314,6 @@ def customer_recommendations(
             .distinct()
         )
     )
-    history_articles = {
-        article.article_key: article
-        for article in db.scalars(select(Article).where(Article.article_key.in_(seen_keys)))
-    }
     model = db.scalar(select(ModelVersion).where(ModelVersion.is_active.is_(True)))
     fallback_reason: str | None = None
     model_metadata: ModelMetadataResponse | None = None
@@ -1197,9 +1354,20 @@ def customer_recommendations(
                 fallback_reason = "profile_not_in_model"
             else:
                 raise HTTPException(status_code=502, detail="Recommendation backend returned invalid strategy")
-    items = _recommendation_items(
-        db, customer, rows, history_articles, strategy=strategy
-    )
+    if strategy == "model":
+        applied_weights = requested_weights
+        items = _hybrid_items(
+            db,
+            customer,
+            rows,
+            seen_keys,
+            k=k,
+            exclude_seen_articles=exclude_seen_articles,
+            weights=applied_weights,
+        )
+    else:
+        applied_weights = {"model": 0.0, "category": 0.0, "popularity": 100.0, "trend": 0.0}
+        items = _popular_items(db, rows)
     if exclude_seen_articles and any(
         article_key in seen_keys
         for article_key in (
@@ -1207,7 +1375,7 @@ def customer_recommendations(
             for item in items
         )
     ):
-        raise HTTPException(status_code=502, detail="Recommendation backend returned purchased articles")
+        raise HTTPException(status_code=502, detail="Backend retornou produtos já comprados")
     return RecommendationResponse(
         profile_id=profile_id,
         strategy=strategy,
@@ -1216,6 +1384,7 @@ def customer_recommendations(
         score_semantics=(
             _model_semantics() if strategy == "model" else _popularity_semantics()
         ),
+        applied_weights=applied_weights,
         exclude_seen_articles=exclude_seen_articles,
         inference_duration_ms=(time.perf_counter() - started) * 1000,
         items=items,

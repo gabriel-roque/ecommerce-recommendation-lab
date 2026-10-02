@@ -10,38 +10,22 @@ def article(key: int, article_id: str) -> Article:
     return Article(
         article_key=key,
         article_id=article_id,
-        product_code=article_id[:7],
-        prod_name="Product",
-        product_type_no=1,
-        product_type_name="Garment",
-        product_group_name="Garments",
-        graphical_appearance_no=1,
-        graphical_appearance_name="Solid",
-        colour_group_code=1,
-        colour_group_name="Black",
-        perceived_colour_value_id=1,
-        perceived_colour_value_name="Dark",
-        perceived_colour_master_id=1,
-        perceived_colour_master_name="Black",
-        department_no=1,
-        department_name="Tops",
-        index_code="A",
-        index_name="Ladieswear",
-        index_group_no=1,
-        index_group_name="Ladieswear",
-        section_no=1,
-        section_name="Womens Everyday",
-        garment_group_no=1,
-        garment_group_name="Jersey Fancy",
+        product_name="Produto",
+        department_name="Casa",
+        category_name="Cozinha",
+        subcategory_name="Utensílio",
+        brand="Aurora",
+        price_band="econômico",
+        detail_desc="Produto brasileiro para uso cotidiano.",
     )
 
 
 def seed_dataset(db):
     db.add_all(
         [
-            Customer(customer_key=1, customer_id="source-1", profile_id="profile-1", age=31, age_band="25-34"),
-            Customer(customer_key=2, customer_id="source-2", profile_id="profile-2", age=None, age_band=None),
-            Customer(customer_key=3, customer_id="source-3", profile_id="profile-3", age=51, age_band="45-54"),
+            Customer(customer_key=1, customer_id="source-1", profile_id="profile-1", name="Lucas Almeida", age=31, age_band="25-34", state="SP", region="Sudeste"),
+            Customer(customer_key=2, customer_id="source-2", profile_id="profile-2", name="Mariana Souza", age=40, age_band="35-44", state="PE", region="Nordeste"),
+            Customer(customer_key=3, customer_id="source-3", profile_id="profile-3", name="Rafael Oliveira", age=51, age_band="45-54", state="RS", region="Sul"),
             article(10, "0000000010"),
             article(11, "0000000011"),
             article(12, "0000000012"),
@@ -76,14 +60,16 @@ def test_cors_allows_local_frontend_private_network(client):
     assert response.headers["access-control-allow-private-network"] == "true"
 
 
-def test_dataset_stats_use_hm_purchase_contract(client, db):
+def test_dataset_stats_use_synthetic_purchase_contract(client, db):
     seed_dataset(db)
 
     response = client.get("/dataset/stats")
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["dataset_name"] == "H&M Personalized Fashion Recommendations"
+    assert payload["dataset_name"] == "E-commerce Recommendation Lab"
+    assert payload["locale"] == "pt-BR"
+    assert payload["currency"] == "BRL"
     assert payload["semantics"] == "purchase_history"
     assert payload["total_purchases"] == 3
     assert payload["unique_customers"] == 3
@@ -101,8 +87,12 @@ def test_dataset_stats_use_hm_purchase_contract(client, db):
         "51-100": 0,
         "101+": 0,
     }
-    assert payload["age_band_counts"] == {"25-34": 1, "45-54": 1, "unknown": 1}
-    assert payload["top_articles"][0] == {"article_id": "0000000010", "purchases": 2}
+    assert payload["age_band_counts"] == {"25-34": 1, "35-44": 1, "45-54": 1}
+    assert payload["top_articles"][0] == {
+        "article_id": "0000000010",
+        "product_name": "Produto",
+        "purchases": 2,
+    }
     assert payload["date_range"] == {
         "start": "2020-01-01",
         "end": "2020-01-03",
@@ -112,15 +102,18 @@ def test_dataset_stats_use_hm_purchase_contract(client, db):
         assert retail_field not in payload
 
 
-def test_dataset_stats_only_trust_matching_hm_manifest(client, db, tmp_path, monkeypatch):
+def test_dataset_stats_only_trust_matching_synthetic_manifest(client, db, tmp_path, monkeypatch):
     seed_dataset(db)
     manifest = tmp_path / "dataset_manifest.json"
     manifest.write_text(
         json.dumps(
             {
-                "dataset": "hm",
-                "dataset_name": "H&M Personalized Fashion Recommendations",
+                "dataset": "ecommerce_sintetico_br",
+                "dataset_name": "E-commerce Recommendation Lab",
                 "semantics": "purchase_only",
+                "synthetic": True,
+                "currency": "BRL",
+                "source_fingerprint": "abc",
                 "catalog_customers": 3,
                 "catalog_articles": 3,
                 "purchases": 3,
@@ -140,8 +133,11 @@ def test_dataset_stats_only_trust_matching_hm_manifest(client, db, tmp_path, mon
     manifest.write_text(
         json.dumps(
             {
-                "dataset": "hm",
+                "dataset": "ecommerce_sintetico_br",
                 "semantics": "purchase_only",
+                "synthetic": True,
+                "currency": "BRL",
+                "source_fingerprint": "abc",
                 "catalog_customers": 3,
                 "catalog_articles": 3,
                 "purchases": 4,

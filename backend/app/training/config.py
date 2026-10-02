@@ -9,24 +9,24 @@ from typing import Any, Literal, Mapping
 DataProfile = Literal["fast", "balanced", "extensive", "full"]
 DATA_PROFILES: dict[DataProfile, dict[str, Any]] = {
     "fast": {
-        "target_purchases": 25_000,
-        "label": "Fast",
-        "description": "Small deterministic sample for quick experiments.",
+        "target_purchases": 10_000,
+        "label": "Rápido",
+        "description": "Amostra determinística pequena para experimentos rápidos.",
     },
     "balanced": {
-        "target_purchases": 100_000,
-        "label": "Balanced",
-        "description": "Default sample balancing runtime and coverage.",
+        "target_purchases": 25_000,
+        "label": "Equilibrado",
+        "description": "Amostra padrão que equilibra tempo e cobertura.",
     },
     "extensive": {
-        "target_purchases": 250_000,
-        "label": "Extensive",
-        "description": "Larger sample for broader user and item coverage.",
+        "target_purchases": 40_000,
+        "label": "Amplo",
+        "description": "Amostra maior para ampliar cobertura de clientes e produtos.",
     },
     "full": {
         "target_purchases": None,
-        "label": "Full",
-        "description": "All source purchases without sampling.",
+        "label": "Completo",
+        "description": "Todas as 47.500 compras, sem amostragem.",
     },
 }
 

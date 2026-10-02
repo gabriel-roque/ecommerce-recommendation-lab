@@ -32,7 +32,7 @@ def test_complete_artifact_reloads_and_runs_inference(tmp_path):
         features,
         {"embedding_dim": 2},
         {"recall_at_10": 0.5},
-        {"dataset": "hm", "semantics": "purchase_only", "purchases": 4, "sampled": False},
+        {"dataset": "ecommerce_sintetico_br", "semantics": "purchase_only", "purchases": 4, "sampled": False, "source_fingerprint": "abc"},
     )
     assert {path.name for path in destination.iterdir()} == {
         "model.keras",
@@ -49,8 +49,8 @@ def test_complete_artifact_reloads_and_runs_inference(tmp_path):
     assert loaded.mappings.customer_keys.tolist() == [10, 20]
 
 
-def test_load_rejects_artifact_without_hm_format(tmp_path):
+def test_load_rejects_artifact_without_ecommerce_format(tmp_path):
     from app.models.artifact import load_artifact
 
-    with pytest.raises(ValueError, match="H&M hybrid"):
+    with pytest.raises(ValueError, match="ecommerce hybrid"):
         load_artifact(tmp_path)

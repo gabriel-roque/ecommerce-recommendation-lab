@@ -1,4 +1,4 @@
-"""Compact mappings between H&M database keys and embedding indices."""
+"""Compact mappings between database keys and embedding indices."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def _integer_array(values: Iterable[int] | np.ndarray, name: str) -> np.ndarray:
 
 @dataclass(frozen=True)
 class DenseMappings:
-    """Sorted H&M keys; array offsets are stable dense indices."""
+    """Sorted catalog keys; array offsets are stable dense indices."""
 
     customer_keys: np.ndarray
     article_keys: np.ndarray

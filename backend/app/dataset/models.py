@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 class DatasetError(ValueError):
-    """Base error for incomplete or invalid H&M dataset operations."""
+    """Base error for incomplete or invalid dataset operations."""
 
 
 class DatasetValidationError(DatasetError):

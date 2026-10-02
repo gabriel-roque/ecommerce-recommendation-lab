@@ -9,10 +9,17 @@ __pycache__/
 .coverage
 htmlcov/
 
+data/*
+!data/raw/
 data/raw/*
 !data/raw/.gitkeep
+!data/processed/
 data/processed/*
 !data/processed/.gitkeep
+!data/ecommerce_sintetico_br/
+!data/ecommerce_sintetico_br/*.csv
+!data/ecommerce_sintetico_br/dataset_manifest.json
+!data/ecommerce_sintetico_br/dataset_stats.json
 artifacts/*
 !artifacts/.gitkeep
 archive.zip

@@ -64,7 +64,7 @@ def _load_purchases() -> PurchaseColumns:
     with get_session() as session:
         count = int(session.scalar(select(func.count(Purchase.id))) or 0)
         if count == 0:
-            raise ValueError("Database contains no H&M purchases")
+            raise ValueError("O banco não contém compras")
         columns = {
             "timestamp": np.empty(count, dtype=np.int64),
             "customer_key": np.empty(count, dtype=np.int64),
@@ -146,7 +146,7 @@ def _load_sampled_purchase_pool(config: TrainingConfig, catalog_customers: int) 
             if len(values["timestamp"]) >= target * 2:
                 break
     if not values["timestamp"]:
-        raise ValueError("Database contains no H&M purchases for sampled customers")
+        raise ValueError("O banco não contém compras para os clientes amostrados")
     return PurchaseColumns(
         {
             "timestamp": np.asarray(values["timestamp"], dtype=np.int64),
@@ -179,7 +179,7 @@ def _load_feature_rows(
                 )
             )
     if len(rows) != unique_keys.size:
-        raise ValueError(f"Some purchase {key_name} values have no H&M metadata")
+        raise ValueError(f"Algumas compras têm valores {key_name} sem metadados")
     return rows
 
 
@@ -189,10 +189,10 @@ def _manifest(*, validate_database: bool = True) -> dict[str, Any]:
         manifest = json.load(stream)
     if (
         not isinstance(manifest, dict)
-        or manifest.get("dataset") != "hm"
+        or manifest.get("dataset") != "ecommerce_sintetico_br"
         or manifest.get("semantics") != "purchase_only"
     ):
-        raise ValueError("Dataset manifest must identify purchase-only H&M data")
+        raise ValueError("Manifesto deve identificar ecommerce_sintetico_br com compras")
     if validate_database:
         with get_session() as session:
             purchase_count = int(session.scalar(select(func.count(Purchase.id))) or 0)
@@ -420,7 +420,12 @@ def run_once(
             with get_session() as session:
                 run = session.get(TrainingRun, run_id)
                 if run is not None:
-                    run.config = {**config.to_dict(), "data_manifest": training_manifest}
+                    run.config = {
+                        **config.to_dict(),
+                        "data_manifest": training_manifest,
+                        "source_fingerprint": source_manifest["source_fingerprint"],
+                        "automatic": bool(values.get("automatic", False)),
+                    }
                     session.commit()
             outcome = TrainingPipeline(root, config, observer).run(
                 purchases,

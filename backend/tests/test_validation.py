@@ -10,14 +10,20 @@ from backend.app.validation import ReportSection, ValidationReportError, generat
 
 def _manifest() -> dict[str, object]:
     return {
-        "files": {"customers.csv": 5, "articles.csv": 4, "transactions_train.csv": 10},
+        "dataset": "ecommerce_sintetico_br",
+        "dataset_name": "E-commerce Recommendation Lab",
+        "locale": "pt-BR",
+        "currency": "BRL",
+        "synthetic": True,
+        "sampled": False,
+        "total_records": 19,
+        "files": {"customers.csv": 5, "products.csv": 4, "purchases.csv": 10},
         "source_files": {
             "customers.csv": {"rows": 5, "bytes": 100, "sha256": "a" * 64},
-            "articles.csv": {"rows": 4, "bytes": 200, "sha256": "b" * 64},
-            "transactions_train.csv": {"rows": 10, "bytes": 300, "sha256": "c" * 64},
+            "products.csv": {"rows": 4, "bytes": 200, "sha256": "b" * 64},
+            "purchases.csv": {"rows": 10, "bytes": 300, "sha256": "c" * 64},
         },
         "source_fingerprint": "d" * 64,
-        "official_counts_validated": False,
         "catalog_customers": 5,
         "catalog_articles": 4,
         "interacting_customers": 3,
@@ -28,7 +34,7 @@ def _manifest() -> dict[str, object]:
     }
 
 
-def test_report_uses_hm_observed_results(tmp_path: Path) -> None:
+def test_report_uses_synthetic_observed_results(tmp_path: Path) -> None:
     manifest = tmp_path / "dataset_manifest.json"
     stats = tmp_path / "dataset_stats.json"
     manifest.write_text(json.dumps(_manifest()), encoding="utf-8")

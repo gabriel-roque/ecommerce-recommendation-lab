@@ -17,3 +17,6 @@ export const SearchIcon = (props: IconProps) => <Base {...props}><circle cx="11"
 export const AlertIcon = (props: IconProps) => <Base {...props}><path d="M12 3 2.5 20h19L12 3Z" /><path d="M12 9v5M12 17.5v.5" /></Base>
 export const CheckIcon = (props: IconProps) => <Base {...props}><path d="m5 12 4 4L19 6" /></Base>
 export const CpuIcon = (props: IconProps) => <Base {...props}><rect x="7" y="7" width="10" height="10" rx="1" /><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3M10 10h4v4h-4z" /></Base>
+export const InfoIcon = (props: IconProps) => <Base {...props}><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></Base>
+export const BookIcon = (props: IconProps) => <Base {...props}><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H11v18H6.5A2.5 2.5 0 0 0 4 22.5zM20 4.5A2.5 2.5 0 0 0 17.5 2H13v18h4.5a2.5 2.5 0 0 1 2.5 2.5z" /></Base>
+export const CloseIcon = (props: IconProps) => <Base {...props}><path d="m6 6 12 12M18 6 6 18" /></Base>

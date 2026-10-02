@@ -1,3 +1,5 @@
+version: "2.4"
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -14,6 +16,24 @@ services:
       timeout: 5s
       retries: 20
 
+  bootstrap:
+    image: ecommerce-recommendation-lab-bootstrap:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["python", "-m", "app.cli", "bootstrap"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@postgres:5432/recommendations}
+      DATASET_MANIFEST_PATH: /workspace/data/ecommerce_sintetico_br/dataset_manifest.json
+      DATASET_STATS_PATH: /workspace/data/ecommerce_sintetico_br/dataset_stats.json
+      ARTIFACTS_DIR: /workspace/artifacts
+    volumes:
+      - ./data:/workspace/data
+      - ./artifacts:/workspace/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     init: true
     restart: unless-stopped
@@ -23,15 +43,14 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@postgres:5432/recommendations}
-      CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:5173"]}'
+      CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:5173","http://127.0.0.1:5173"]}'
       AUTO_CREATE_TABLES: ${AUTO_CREATE_TABLES:-true}
       SSE_POLL_INTERVAL_SECONDS: ${SSE_POLL_INTERVAL_SECONDS:-0.5}
       REQUIRE_FULL_DATASET: ${REQUIRE_FULL_DATASET:-true}
-      DATASET_MANIFEST_PATH: /workspace/data/processed/dataset_manifest.json
-      DATASET_STATS_PATH: /workspace/data/processed/dataset_stats.json
+      DATASET_MANIFEST_PATH: /workspace/data/ecommerce_sintetico_br/dataset_manifest.json
+      DATASET_STATS_PATH: /workspace/data/ecommerce_sintetico_br/dataset_stats.json
       POPULARITY_PATH: /workspace/data/processed/popularity.json
       ARTIFACTS_DIR: /workspace/artifacts
-      RECOMMENDATION_CANDIDATE_LIMIT: ${RECOMMENDATION_CANDIDATE_LIMIT:-20000}
       PRELOAD_ACTIVE_MODEL: ${PRELOAD_ACTIVE_MODEL:-true}
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
@@ -39,8 +58,8 @@ services:
       - ./data:/workspace/data
       - ./artifacts:/workspace/artifacts
     depends_on:
-      postgres:
-        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 10s
@@ -63,14 +82,14 @@ services:
       TRAINER_HEARTBEAT_SECONDS: ${TRAINER_HEARTBEAT_SECONDS:-10}
       TRAINER_HEARTBEAT_TIMEOUT_SECONDS: ${TRAINER_HEARTBEAT_TIMEOUT_SECONDS:-120}
       TRAINER_DATABASE_RETRY_SECONDS: ${TRAINER_DATABASE_RETRY_SECONDS:-2}
-      DATASET_MANIFEST_PATH: /workspace/data/processed/dataset_manifest.json
+      DATASET_MANIFEST_PATH: /workspace/data/ecommerce_sintetico_br/dataset_manifest.json
       TRAINING_SAMPLES_DIR: /workspace/data/processed/samples
     volumes:
       - ./data:/workspace/data
       - ./artifacts:/workspace/artifacts
     depends_on:
-      postgres:
-        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "from sqlalchemy import text; from app.database.session import get_session; s = get_session(); s.execute(text('SELECT 1')); s.close()"]
       interval: 30s

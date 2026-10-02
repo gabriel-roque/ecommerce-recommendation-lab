@@ -1,21 +1,21 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { ArticleMetadata } from '../types/api'
+import type { Product, Purchase, Recommendation } from '../types/api'
 import { RecommendationConnectionVisualizer } from './RecommendationConnectionVisualizer'
 
-const article: ArticleMetadata = { article_id: '0706016001', product_name: 'Jersey top', product_type_name: 'Top', product_group_name: null, colour_group_name: 'Black', department_name: 'Jersey', section_name: null, garment_group_name: null, detail_desc: null }
-const purchases = [{ purchased_at: '2026-01-01T00:00:00Z', article_id: article.article_id, source_price: .02, sales_channel_id: 2, article }]
-const recommendations = [{ rank: 1, article_id: '0999999001', relevance_score: .92, article: { ...article, article_id: '0999999001' }, evidence: [] }]
+const article: Product = { article_id: 'PROD-001', product_name: 'Cafeteira compacta', department_name: 'Casa', category_name: 'Cozinha', subcategory_name: 'Cafeteiras', brand: 'Aurora', price_band: 'R$ 100 a R$ 200', detail_desc: 'Cafeteira para uso doméstico.' }
+const purchases: Purchase[] = [{ purchased_at: '2026-01-01T00:00:00Z', article_id: article.article_id, price: 149.9, sales_channel_id: 2, article }]
+const recommendations: Recommendation[] = [{ rank: 1, article_id: 'PROD-002', score: 78.9, grade: 'alto', article: { ...article, article_id: 'PROD-002' }, evidence: [], breakdown: {} }]
 
 describe('RecommendationConnectionVisualizer', () => {
-  it('describes hybrid profile and purchase context', () => {
-    render(<RecommendationConnectionVisualizer profileId="abc" purchases={purchases} recommendations={recommendations} strategy="hybrid" />)
-    expect(screen.getByRole('img', { name: /conexões entre compras/i })).toHaveAccessibleDescription(/perfil pseudônimo abc/i)
-    expect(screen.getByText(/representa profile_id pseudônimo/i)).toBeInTheDocument()
+  it('states that hybrid map is factual and non-causal', () => {
+    render(<RecommendationConnectionVisualizer profileId="abc" customerName="Lucas Almeida" purchases={purchases} recommendations={recommendations} strategy="model" />)
+    expect(screen.getByRole('img', { name: /relações visuais entre compras/i })).toHaveAccessibleDescription(/não indicam causalidade/i)
+    expect(screen.getByText(/não explica recomendação individual/i)).toBeInTheDocument()
   })
-  it('shows no profile purchase edge for popular fallback', () => {
-    render(<RecommendationConnectionVisualizer profileId="abc" purchases={purchases} recommendations={recommendations} strategy="popular" />)
-    expect(screen.getByRole('img', { name: /conexões entre compras/i })).toHaveAccessibleDescription(/Nenhuma conexão personalizada/i)
-    expect(screen.queryByText(/Compra observada do artigo/i)).not.toBeInTheDocument()
+  it('shows no customer purchase relation for popularity fallback', () => {
+    render(<RecommendationConnectionVisualizer profileId="abc" customerName="Lucas Almeida" purchases={purchases} recommendations={recommendations} strategy="popularity" />)
+    expect(screen.getByRole('img', { name: /relações visuais entre compras/i })).toHaveAccessibleDescription(/Nenhuma relação personalizada/i)
+    expect(screen.queryByText(/Compra observada do produto/i)).not.toBeInTheDocument()
   })
 })
