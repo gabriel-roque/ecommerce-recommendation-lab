@@ -1,81 +1,81 @@
 # E-commerce Recommendation Lab
 
-Laboratório didático de recomendação para e-commerce brasileiro. O projeto usa apenas dados sintéticos em PT-BR, versionados no repositório, com preços em BRL.
+Hands-on recommendation lab for Brazilian e-commerce. The project uses only synthetic PT-BR data committed to the repository, with prices in BRL.
 
 ## Dataset
 
-O dataset padrão é `ecommerce_sintetico_br` e fica em `data/ecommerce_sintetico_br/`:
+The default dataset is `ecommerce_sintetico_br`, stored in `data/ecommerce_sintetico_br/`:
 
-- `customers.csv`: 2.000 clientes brasileiros;
-- `products.csv`: 500 produtos genéricos;
-- `purchases.csv`: 47.500 compras;
-- `dataset_manifest.json`: checksums, fingerprint, contagens e contrato da fonte;
-- `dataset_stats.json`: estatísticas observadas.
+- `customers.csv`: 2,000 synthetic Brazilian customers;
+- `products.csv`: 500 generic products;
+- `purchases.csv`: 47,500 purchases;
+- `dataset_manifest.json`: checksums, fingerprint, counts, and source contract;
+- `dataset_stats.json`: observed statistics.
 
-Os três CSVs somam exatamente 50.000 registros. O gerador usa seed fixa e produz os mesmos bytes em toda execução:
+The three CSV files contain exactly 50,000 records. The generator uses a fixed seed and produces the same bytes on every run:
 
 ```bash
 PYTHONPATH=backend python -m app.cli generate-data
 PYTHONPATH=backend python -m app.cli verify-data
 ```
 
-O sinal sintético inclui afinidades fortes, cauda longa de clientes e produtos, sazonalidade, tendência recente e ruído. As personas fixas são Lucas, Mariana, Rafael, Camila, Juliana e Bruno.
+The synthetic signal includes strong preferences, long-tail customer and product activity, seasonality, recent trends, and noise. Fixed personas include Lucas, Mariana, Rafael, Camila, Juliana, and Bruno.
 
-## Arquitetura
+## Architecture
 
 ```text
-CSV sintético -> bootstrap idempotente -> PostgreSQL
-                                         |
-                                         v
-                                 trainer TensorFlow
-                                         |
-                                         v
-                              artefato ecommerce-hybrid
-                                         |
-                                         v
-React <- FastAPI <- ranking explicável / fallback de popularidade
+Synthetic CSV -> idempotent bootstrap -> PostgreSQL
+                                             |
+                                             v
+                                    TensorFlow trainer
+                                             |
+                                             v
+                                  ecommerce-hybrid artifact
+                                             |
+                                             v
+React <- FastAPI <- explainable ranking / popularity fallback
 ```
 
-Tabelas principais:
+Main tables:
 
-- `customers`: ID interno, ID público, nome, idade, faixa etária, estado e região;
-- `articles`: produto, departamento, categoria, subcategoria, marca e faixa de preço;
-- `purchases`: data, cliente, produto, preço BRL e canal;
-- `dataset_state`: fingerprint importado;
-- `training_runs`, `training_metrics`, `training_network_snapshots`: execução e telemetria;
-- `model_versions`: artefatos treinados e ativação.
+- `customers`: internal ID, public ID, name, age, age band, state, and region;
+- `articles`: product, department, category, subcategory, brand, and price band;
+- `purchases`: date, customer, product, BRL price, and channel;
+- `dataset_state`: imported source fingerprint;
+- `training_runs`, `training_metrics`, `training_network_snapshots`: execution state and telemetry;
+- `model_versions`: trained artifacts and activation state.
 
 ## Docker
 
-Requisitos: Docker Compose v1.29 ou Compose v2.
+Requirements: Docker Compose v1.29 or Compose v2.
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-Também funciona com `docker-compose up --build`.
+`docker-compose up --build` is also supported.
 
-O serviço one-shot `bootstrap` aguarda PostgreSQL, valida os CSVs, importa apenas quando o fingerprint muda e enfileira exatamente um treino automático para esse fingerprint. `api` e `trainer` iniciam somente após sucesso do bootstrap. Segundo boot preserva banco, modelo e volume, sem nova importação ou novo treino.
+The one-shot `bootstrap` service waits for PostgreSQL, validates the CSV files, imports them only when the fingerprint changes, and queues exactly one automatic training run for that fingerprint. `api` and `trainer` start only after bootstrap succeeds. A second startup preserves the database, model, and volumes without importing or training again.
 
-Serviços:
+Services:
 
 - frontend: <http://localhost:5173>
 - API: <http://localhost:8000>
 - OpenAPI: <http://localhost:8000/docs>
 
-## Treinamento
+## Training
 
-Perfis determinísticos:
+Deterministic data profiles:
 
-- `fast`: 10.000 compras;
-- `balanced`: 25.000 compras;
-- `extensive`: 40.000 compras;
-- `full`: todas as 47.500 compras.
+- `fast`: 10,000 purchases;
+- `balanced`: 25,000 purchases;
+- `extensive`: 40,000 purchases;
+- `full`: all 47,500 purchases.
 
-Primeiro boot enfileira `full`, 4 epochs, batch 2.048. Enquanto treino não termina, API usa fallback de popularidade. Artefatos têm formato `ecommerce-hybrid` versão 2 e registram `source_fingerprint`.
+The first startup queues the `full` profile with 4 epochs and a batch size of 2,048. Until training finishes, the API uses the popularity fallback. Artifacts use `ecommerce-hybrid` format version 2 and record the `source_fingerprint`.
 
-Treino manual continua disponível:
+Manual training remains available:
 
 ```bash
 curl -X POST http://localhost:8000/training/runs \
@@ -85,15 +85,15 @@ curl -X POST http://localhost:8000/training/runs \
 
 ## Ranking
 
-`GET /customers/{profile_id}/recommendations` pontua todo produto elegível do catálogo. Com modelo ativo, score final usa escala 0 a 100:
+`GET /customers/{profile_id}/recommendations` scores every eligible product in the catalog. With an active model, the final score uses a 0-100 scale:
 
 ```text
 45 * model_raw + 30 * category_raw + 15 * popularity_raw + 10 * trend_raw
 ```
 
-Pesos podem ser alterados por `model_weight`, `category_weight`, `popularity_weight` e `trend_weight`. Todos devem ser não negativos e somar 100. Resposta inclui `applied_weights`, grade (`baixo`, `medio`, `alto`, `muito_alto`) e breakdown factual dos quatro componentes.
+Weights can be changed through `model_weight`, `category_weight`, `popularity_weight`, and `trend_weight`. All weights must be non-negative and total 100. The response includes `applied_weights`, a grade (`baixo`, `medio`, `alto`, or `muito_alto`), and a factual breakdown of all four components.
 
-Score serve somente para ordenação. Não representa probabilidade de compra nem efeito causal. Sem modelo, API informa motivo e usa popularidade observada com normalização logarítmica.
+Scores are used only for ranking. They do not represent purchase probability or causal effects. Without an active model, the API reports the fallback reason and uses logarithmically normalized observed popularity.
 
 ## API
 
@@ -110,9 +110,9 @@ Score serve somente para ordenação. Não representa probabilidade de compra ne
 - `GET /customers/{profile_id}/recommendations`
 - `GET /recommendations/popular`
 
-## Verificação
+## Verification
 
-Execute da raiz:
+Run from the repository root:
 
 ```bash
 PYTHONPATH=.:backend python -m pytest backend/tests -q
@@ -120,16 +120,16 @@ cd backend && python -m mypy app
 docker compose config
 ```
 
-## Estrutura
+## Project Structure
 
 ```text
-backend/app/api/             contratos HTTP, ranking e SSE
-backend/app/database/        schema e sessões SQLAlchemy
-backend/app/dataset/         gerador, validação, manifesto e importação
-backend/app/models/          features, mappings, modelo e artefatos
-backend/app/recommendation/  inferência e popularidade
-backend/app/training/        sampling, pipeline, métricas e worker
-data/ecommerce_sintetico_br/ dataset versionado
-data/processed/              caches e resultados derivados ignorados
-artifacts/                   modelos locais ignorados
+backend/app/api/             HTTP contracts, ranking, and SSE
+backend/app/database/        SQLAlchemy schema and sessions
+backend/app/dataset/         generator, validation, manifest, and import
+backend/app/models/          features, mappings, model, and artifacts
+backend/app/recommendation/  inference and popularity
+backend/app/training/        sampling, pipeline, metrics, and worker
+data/ecommerce_sintetico_br/ versioned synthetic dataset
+data/processed/              ignored caches and derived results
+artifacts/                   ignored local models
 ```
