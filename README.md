@@ -1,3 +1,5 @@
+![E-commerce Recommendation Lab](docs/ecommerce-recommendation-lab-cover.png)
+
 # E-commerce Recommendation Lab
 
 Hands-on recommendation lab for Brazilian e-commerce. The project uses only synthetic PT-BR data committed to the repository, with prices in BRL.
